@@ -6,6 +6,7 @@ import time
 import datetime
 import urllib2
 import logging
+import re
 
 logging.basicConfig(
     format='%(asctime)s - %(levelname)s - %(message)s', level=logging.INFO)
@@ -157,6 +158,8 @@ def get_house_percommunity(city, communityname):
                 unitPrice = name.find("div", {"class": "unitPrice"})
                 info_dict.update({u'unitPrice': unitPrice.get('data-price')})
                 info_dict.update({u'houseID': unitPrice.get('data-hid')})
+                
+                info_dict.update({u'channel': u'lianjia'})
             except:
                 continue
             # houseinfo insert into mysql
@@ -253,7 +256,8 @@ def get_sell_percommunity(city, communityname):
                     dealDate = name.find("div", {"class": "dealDate"})
                     info_dict.update(
                         {u'dealdate': dealDate.get_text().strip().replace('.', '-')})
-
+                    
+                    info_dict.update({u'channel': u'lianjia'})
                 except:
                     continue
                 # Sellinfo insert into mysql
@@ -323,11 +327,17 @@ def get_community_perregion(city, regionname=u'xicheng'):
                 price = name.find("div", {"class": "totalPrice"})
                 info_dict.update({u'price': price.span.get_text().strip('\n')})
 
+                image = name.find("img", {"class": "lj-lazy"})
+                info_dict.update({u'image': image.get('data-original')})
+                
+                info_dict.update({u'channel': u'lianjia'})
+
                 communityinfo = get_communityinfo_by_url(link)
                 for key, value in communityinfo.iteritems():
                     info_dict.update({key: value})
 
                 info_dict.update({u'city': city})
+                
             except:
                 continue
             # communityinfo insert into mysql
@@ -415,6 +425,7 @@ def get_rent_percommunity(city, communityname):
                     info_dict.update(
                         {u'pricepre': pricepre.get_text().strip()})
 
+                    info_dict.update({u'channel': u'lianjia'})
                 except:
                     continue
                 # Rentinfo insert into mysql
@@ -462,15 +473,25 @@ def get_house_perregion(city, district):
 
                     houseinfo = name.find("div", {"class": "houseInfo"})
                     info = houseinfo.get_text().split('|')
-                    info_dict.update({u'community': info[0]})
-                    info_dict.update({u'housetype': info[1]})
-                    info_dict.update({u'square': info[2]})
-                    info_dict.update({u'direction': info[3]})
-                    info_dict.update({u'decoration': info[4]})
 
-                    housefloor = name.find("div", {"class": "positionInfo"})
-                    info_dict.update({u'years': housefloor.get_text().strip()})
-                    info_dict.update({u'floor': housefloor.get_text().strip()})
+                    info_dict.update({u'housetype': info[0]})
+                    info_dict.update({u'square': info[1]})
+                    info_dict.update({u'direction': info[2]})
+                    info_dict.update({u'decoration': info[3]})
+                    info_dict.update({u'floor': info[4]})
+                    info_dict.update({u'years': info[5]})
+
+                    image = name.find("img", {"class": "lj-lazy"})
+                    info_dict.update({u'image': image.get('data-original')})
+
+                    positionInfo = name.find("div", {"class": "positionInfo"})
+                    info_dict.update({u'community': positionInfo.get_text().strip()})
+                    regionInfo = positionInfo.find("a", {"data-el": "region"})
+                    if regionInfo != None:
+                        regionHref = regionInfo.get('href');
+                        communityIdRe = re.findall('\d+', str(regionHref))
+                        if len(communityIdRe) > 0:
+                            info_dict.update({u'communityId': communityIdRe[0]})
 
                     followInfo = name.find("div", {"class": "followInfo"})
                     info_dict.update(
@@ -490,6 +511,8 @@ def get_house_perregion(city, district):
                     unitPrice = name.find("div", {"class": "unitPrice"})
                     info_dict.update(
                         {u'unitPrice': unitPrice.get("data-price")})
+
+                    info_dict.update({u'channel': u'lianjia'})
                 except:
                     continue
 
@@ -622,6 +645,20 @@ def get_communityinfo_by_url(url):
 
         except:
             continue
+
+    thumbnail = soup.find("ol", {"id": "overviewThumbnail"})
+    images = []
+    if thumbnail != None:
+        for li in thumbnail.find_all('li'):
+            try:
+                image = li.get("data-src")
+                images.append(image)
+            except:
+                continue
+            
+        imagelist = ','.join(images)
+        res.update({'imagelist': imagelist})
+
     return res
 
 

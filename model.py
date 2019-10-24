@@ -55,6 +55,10 @@ class Community(BaseModel):
     house_num = CharField(null=True)
     price = CharField(null=True)
     city = CharField(null=True)
+    image = TextField(null=True)
+    imagelist = TextField(null=True)
+    channel = CharField()
+    metadata = TextField(null=True)
     validdate = DateTimeField(default=datetime.datetime.now)
 
 
@@ -63,6 +67,7 @@ class Houseinfo(BaseModel):
     title = CharField()
     link = CharField()
     community = CharField()
+    communityId = BigIntegerField(null=True)
     years = CharField()
     housetype = CharField()
     square = CharField()
@@ -73,6 +78,10 @@ class Houseinfo(BaseModel):
     unitPrice = CharField()
     followInfo = CharField()
     decoration = CharField()
+    image = TextField(null=True)
+    imagelist = TextField(null=True)
+    channel = CharField()
+    metadata = TextField(null = True)
     validdate = DateTimeField(default=datetime.datetime.now)
 
 
@@ -80,6 +89,7 @@ class Hisprice(BaseModel):
     houseID = CharField()
     totalPrice = CharField()
     date = DateTimeField(default=datetime.datetime.now)
+    metadata = TextField(null = True)
 
     class Meta:
         primary_key = CompositeKey('houseID', 'totalPrice')
@@ -90,6 +100,7 @@ class Sellinfo(BaseModel):
     title = CharField()
     link = CharField()
     community = CharField()
+    communityId = BigIntegerField(null=True)
     years = CharField()
     housetype = CharField()
     square = CharField()
@@ -100,6 +111,10 @@ class Sellinfo(BaseModel):
     totalPrice = CharField()
     unitPrice = CharField()
     dealdate = CharField(null=True)
+    image = TextField(null=True)
+    imagelist = TextField(null=True)
+    channel = CharField()
+    metadata = TextField(null=True)
     updatedate = DateTimeField(default=datetime.datetime.now)
 
 
@@ -116,6 +131,8 @@ class Rentinfo(BaseModel):
     heating = CharField()
     price = CharField()
     pricepre = CharField()
+    channel = CharField()
+    metadata = TextField(null=True)
     updatedate = DateTimeField(default=datetime.datetime.now)
 
 
