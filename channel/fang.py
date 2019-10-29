@@ -315,7 +315,7 @@ def get_community_perregion(city, regionname=u'xicheng'):
                     isAbsoluteUrl = True
                     info_dict.update({u'link': link})
                 else:
-                    info_dict.update({u'link': baseUrl + link})
+                    continue
 
                 districtInfo = communitytitle.find_parent().find_next_sibling('p')
                 district = districtInfo.findAll("a")
@@ -348,10 +348,9 @@ def get_community_perregion(city, regionname=u'xicheng'):
 
                 info_dict.update({u'channel': channel})
 
-                if isAbsoluteUrl:
-                    communityinfo = get_communityinfo_by_url(link)
-                    for key, value in communityinfo.iteritems():
-                        info_dict.update({key: value})
+                communityinfo = get_communityinfo_by_url(link)
+                for key, value in communityinfo.iteritems():
+                    info_dict.update({key: value})
 
                 info_dict.update({u'city': city})
 
