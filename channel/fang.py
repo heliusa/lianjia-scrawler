@@ -484,7 +484,7 @@ def get_house_perregion(city, district):
 
                     info_dict.update(
                         {u'title': housetitle.get('title')})
-                    info_dict.update({u'link': ('https://%s.esf.fang.com' % city) + housetitle.get('href')})
+                    info_dict.update({u'link': baseUrl + housetitle.get('href')})
 
                     houseJson = json.loads(name.get('data-bg'))
 
@@ -780,12 +780,11 @@ def convert_district_for_house(url, district):
     except Exception as e:
         logging.error(e)
 
-    raise RuntimeError("未找到指定对应区域 { %s } 的ID" % district)
+    raise RuntimeError("未找到指定对应区域 { %s } 的ID, url: %s" % (district, url))
 
 def convert_district_for_community(url, district):
     source_code = get_source_code(url)
     soup = BeautifulSoup(source_code, 'lxml', from_encoding='gb18030')
-   
     try:
         screen = soup.find('div', {'class': 'quxian'})
         screenTitle = screen.find('span', {'class': 'type'})
@@ -798,4 +797,4 @@ def convert_district_for_community(url, district):
     except Exception as e:
         logging.error(e)
 
-    raise RuntimeError("未找到指定对应区域 { %s } 的ID" % district)
+    raise RuntimeError("未找到指定对应区域 { %s } 的ID, url: %s" % (district, url))

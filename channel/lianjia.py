@@ -336,10 +336,12 @@ def get_community_perregion(city, regionname=u'xicheng'):
                 continue
             # communityinfo insert into mysql
             data_source.append(info_dict)
-            # model.Community.insert(**info_dict).upsert().execute()
-        with model.database.atomic():
-            if data_source:
-                model.Community.insert_many(data_source).upsert().execute()
+            model.Community.insert(**info_dict).upsert().execute()
+            
+        # 如果批量插入SQL会超长报错，故改成单条插入    
+        # with model.database.atomic():
+        #     if data_source:
+        #         model.Community.insert_many(data_source).upsert().execute()
         time.sleep(1)
 
 
