@@ -309,7 +309,13 @@ def get_community_perregion(city, regionname=u'xicheng'):
                 title = communitytitle.get_text().strip('\n')
                 link = communitytitle.get('href')
                 info_dict.update({u'title': title})
-                info_dict.update({u'link': link})
+
+                isAbsoluteUrl = False
+                if link.startswith('http') or link.startswith('https') or link.startswith('//'):
+                    isAbsoluteUrl = True
+                    info_dict.update({u'link': link})
+                else:
+                    info_dict.update({u'link': baseUrl + link})
 
                 districtInfo = communitytitle.find_parent().find_next_sibling('p')
                 district = districtInfo.findAll("a")
@@ -342,9 +348,10 @@ def get_community_perregion(city, regionname=u'xicheng'):
 
                 info_dict.update({u'channel': channel})
 
-                communityinfo = get_communityinfo_by_url(link)
-                for key, value in communityinfo.iteritems():
-                    info_dict.update({key: value})
+                if isAbsoluteUrl:
+                    communityinfo = get_communityinfo_by_url(link)
+                    for key, value in communityinfo.iteritems():
+                        info_dict.update({key: value})
 
                 info_dict.update({u'city': city})
 
