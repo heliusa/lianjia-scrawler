@@ -9,7 +9,6 @@ import re
 import json
 from util.log import Log
 import base64
-from pypinyin import pinyin
 from util import urlUtil
 import traceback
 

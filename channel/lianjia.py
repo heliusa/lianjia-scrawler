@@ -514,7 +514,7 @@ def get_house_perregion(city, district):
                 # Houseinfo insert into mysql
                 data_source.append(info_dict)
                 hisprice_data_source.append(
-                    {"houseID": info_dict["houseID"], "totalPrice": info_dict["totalPrice"]})
+                    {"houseID": info_dict["houseID"], "totalPrice": info_dict["totalPrice"],  "channel": channel})
                 # model.Houseinfo.insert(**info_dict).upsert().execute()
                 #model.Hisprice.insert(houseID=info_dict['houseID'], totalPrice=info_dict['totalPrice']).upsert().execute()
 
