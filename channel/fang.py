@@ -484,7 +484,7 @@ def get_house_perregion(city, district):
 
                     info_dict.update(
                         {u'title': housetitle.get('title')})
-                    info_dict.update({u'link': 'https://wuhan.esf.fang.com' + housetitle.get('href')})
+                    info_dict.update({u'link': ('https://%s.esf.fang.com' % city) + housetitle.get('href')})
 
                     houseJson = json.loads(name.get('data-bg'))
 
@@ -703,7 +703,6 @@ def get_total_pages(url):
     source_code = get_source_code(url)
     soup = BeautifulSoup(source_code, 'lxml', from_encoding='gb18030')
     total_pages = 0
-    logging.info('url1:' + url)
     try:
         page_info = soup.find('div', {'class': 'page_al'})
         if page_info == None:
@@ -736,8 +735,6 @@ def get_total_pages(url):
                 
     except AttributeError as e:
         page_info = None
-
-    logging.info(str(total_pages))
 
     # if it doesnot get total page, then return default value 50
     if page_info == None and total_pages == 0:
@@ -777,7 +774,7 @@ def convert_district_for_house(url, district):
                 for tag in screen.findAll('li'):
                     item = tag.a
                     if item.get_text() ==  district:
-                        districtId = item.get('href').lstrip('/')
+                        districtId = item.get('href').strip('/')
                         return districtId
     
     except Exception as e:
