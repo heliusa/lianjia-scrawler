@@ -6,11 +6,16 @@ import time
 import datetime
 import urllib2
 import re
+import json
 from util.log import Log
+import base64
+from pypinyin import pinyin
+from util import urlUtil
+import traceback
 
 logging = Log()
 
-channel = 'lianjia'
+channel = u'fang'
 
 def GetHouseByCommunitylist(city, communitylist):
 
@@ -46,8 +51,9 @@ def GetRentByCommunitylist(city, communitylist):
             get_rent_percommunity(city, community)
         except Exception as e:
             logging.error(e)
-            logging.error(community + "Fail")
+            logging.error(community + " Fail")
             pass
+        
     logging.end()
 
 
@@ -56,10 +62,11 @@ def GetCommunityByRegionlist(city, regionlist=[u'xicheng']):
     for regionname in regionlist:
         try:
             get_community_perregion(city, regionname)
-            logging.info(regionname + "Done")
+            logging.info(regionname + " Done")
         except Exception as e:
             logging.error(e)
-            logging.error(regionname + "Fail")
+            traceback.print_exc()
+            logging.error(regionname + " Fail")
             pass
     logging.end()
 
@@ -100,7 +107,7 @@ def get_house_percommunity(city, communityname):
     total_pages = misc.get_total_pages(url)
 
     if total_pages == None:
-        row = model.Houseinfo.select().count()
+        row = model.Houseinfo.select().where(model.Houseinfo.channel == channel).count()
         raise RuntimeError("Finish at %s because total_pages is None" % row)
 
     for page in range(total_pages):
@@ -158,7 +165,7 @@ def get_house_percommunity(city, communityname):
             # houseinfo insert into mysql
             data_source.append(info_dict)
             hisprice_data_source.append(
-                {"houseID": info_dict["houseID"], "totalPrice": info_dict["totalPrice"]})
+                {"houseID": info_dict["houseID"], "totalPrice": info_dict["totalPrice"], "channel": channel})
             # model.Houseinfo.insert(**info_dict).upsert().execute()
             #model.Hisprice.insert(houseID=info_dict['houseID'], totalPrice=info_dict['totalPrice']).upsert().execute()
 
@@ -171,31 +178,31 @@ def get_house_percommunity(city, communityname):
         time.sleep(1)
 
 
-def get_sell_percommunity(city, communityname):
-    baseUrl = u"http://%s.lianjia.com/" % (city)
-    url = baseUrl + u"chengjiao/rs" + \
-        urllib2.quote(communityname.encode('utf8')) + "/"
-    source_code = misc.get_source_code(url)
+def get_sell_percommunity(city, community):
+    baseUrl = urlUtil.toHttpUrl(community.link)
+    url = baseUrl + u"chengjiao/"
+    source_code = get_source_code(url)
     soup = BeautifulSoup(source_code, 'lxml')
 
     if check_block(soup):
         return
-    total_pages = misc.get_total_pages(url)
+
+    return # 暂时不跑出售记录
+
+    total_pages = get_total_pages(url)
 
     if total_pages == None:
-        row = model.Sellinfo.select().count()
+        row = model.Sellinfo.select().where(model.Sellinfo.channel == channel).count()
         raise RuntimeError("Finish at %s because total_pages is None" % row)
 
     for page in range(total_pages):
         if page > 0:
-            url_page = baseUrl + \
-                u"chengjiao/pg%drs%s/" % (page,
-                                          urllib2.quote(communityname.encode('utf8')))
-            source_code = misc.get_source_code(url_page)
-            soup = BeautifulSoup(source_code, 'lxml')
+            url_page = baseUrl + u"chengjiao/-p1%d-t11/" % page
+            source_code = get_source_code(url_page)
+            soup = BeautifulSoup(source_code, 'lxml', from_encoding='gb18030')
 
-        logging.log_progress("GetSellByCommunitylist",
-                     communityname, page + 1, total_pages)
+        logging.log_progress("GetSellByCommunitylist", community.title, page + 1, total_pages)
+        
         data_source = []
         for ultag in soup.findAll("ul", {"class": "listContent"}):
             for name in ultag.find_all('li'):
@@ -209,7 +216,8 @@ def get_sell_percommunity(city, communityname):
                     info_dict.update({u'houseID': houseID.strip()})
 
                     house = housetitle.get_text().strip().split(' ')
-                    info_dict.update({u'community': communityname})
+                    info_dict.update({u'community': community.title})
+                    info_dict.update({u'communityId': community.id})
                     info_dict.update(
                         {u'housetype': house[1].strip() if 1 < len(house) else ''})
                     info_dict.update(
@@ -264,26 +272,32 @@ def get_sell_percommunity(city, communityname):
 
 
 def get_community_perregion(city, regionname=u'xicheng'):
-    baseUrl = u"http://%s.lianjia.com/" % (city)
-    url = baseUrl + u"xiaoqu/" + regionname + "/"
-    source_code = misc.get_source_code(url)
-    soup = BeautifulSoup(source_code, 'lxml')
+    baseUrl = u"http://%s.esf.fang.com/housing/" % (city)
+    regionname = convert_district_for_community(baseUrl, regionname)
+
+    url = baseUrl + regionname + "/"
+    source_code = get_source_code(url)
+    soup = BeautifulSoup(source_code, 'lxml', from_encoding='gb18030')
 
     if check_block(soup):
         return
-    total_pages = misc.get_total_pages(url)
+    total_pages = get_total_pages(url)
 
     if total_pages == None:
-        row = model.Community.select().count()
+        row = model.Community.select().where(model.Community.channel == channel).count()
         raise RuntimeError("Finish at %s because total_pages is None" % row)
 
     for page in range(total_pages):
         if page > 0:
-            url_page = baseUrl + u"xiaoqu/" + regionname + "/pg%d/" % page
-            source_code = misc.get_source_code(url_page)
-            soup = BeautifulSoup(source_code, 'lxml')
+            params = regionname.split('_')
+            if len(params) > 4:
+                params[len(params)-4] = str(page + 1)
+    
+            url_page = baseUrl +  '_'.join(params) + '/'
+            source_code = get_source_code(url_page)
+            soup = BeautifulSoup(source_code, 'lxml', from_encoding='gb18030')
 
-        nameList = soup.findAll("li", {"class": "clear"})
+        nameList = soup.findAll("div", {"class": "list"})
         i = 0
         logging.log_progress("GetCommunityByRegionlist",
                      regionname, page + 1, total_pages)
@@ -292,37 +306,41 @@ def get_community_perregion(city, regionname=u'xicheng'):
             i = i + 1
             info_dict = {}
             try:
-                communitytitle = name.find("div", {"class": "title"})
+                communitytitle = name.find("a", {"class": "plotTit"})
                 title = communitytitle.get_text().strip('\n')
-                link = communitytitle.a.get('href')
+                link = communitytitle.get('href')
                 info_dict.update({u'title': title})
                 info_dict.update({u'link': link})
 
-                district = name.find("a", {"class": "district"})
-                info_dict.update({u'district': district.get_text()})
+                districtInfo = communitytitle.find_parent().find_next_sibling('p')
+                district = districtInfo.findAll("a")
 
-                bizcircle = name.find("a", {"class": "bizcircle"})
-                info_dict.update({u'bizcircle': bizcircle.get_text()})
+                info_dict.update({u'district': district[0].get_text()})
+                info_dict.update({u'bizcircle': district[1].get_text()})
 
-                tagList = name.find("div", {"class": "tagList"})
-                info_dict.update({u'tagList': tagList.get_text().strip('\n')})
+                tagList = districtInfo.get_text()
+                info_dict.update({u'tagList': tagList.strip('\n')})
 
-                onsale = name.find("a", {"class": "totalSellCount"})
+                onsale = name.find("ul", {"class": "sellOrRenthy"})
                 info_dict.update(
-                    {u'onsale': onsale.span.get_text().strip('\n')})
+                    {u'onsale': onsale.find('li').find('a').get_text().strip('\n').strip()})
 
-                onrent = name.find("a", {"title": title + u"租房"})
+                onrent = onsale.find('li').find_next_sibling('li').find("a")
                 info_dict.update(
-                    {u'onrent': onrent.get_text().strip('\n').split(u'套')[0]})
+                    {u'onrent': onrent.get_text().strip('\n').strip()})
 
-                info_dict.update({u'id': name.get('data-housecode')})
+                year = onsale.find('li').find_next_sibling('li').find_next_sibling('li')
+                info_dict.update({u'year': year.get_text()})
 
-                price = name.find("div", {"class": "totalPrice"})
+                # matchResult = re.match('http:|https:|\/\/(.*)\.fang.com.*', link, re.M |re.I)
+               
+
+                price = name.find("p", {"class": "priceAverage"})
                 info_dict.update({u'price': price.span.get_text().strip('\n')})
 
-                image = name.find("img", {"class": "lj-lazy"})
-                info_dict.update({u'image': image.get('data-original')})
-                
+                image = name.find("dl", {"class": "plotListwrap"}).find('dt').find('img')
+                info_dict.update({u'image': image.get('src')})
+
                 info_dict.update({u'channel': channel})
 
                 communityinfo = get_communityinfo_by_url(link)
@@ -330,15 +348,13 @@ def get_community_perregion(city, regionname=u'xicheng'):
                     info_dict.update({key: value})
 
                 info_dict.update({u'city': city})
-                
+
             except:
                 continue
             # communityinfo insert into mysql
             data_source.append(info_dict)
-            # model.Community.insert(**info_dict).upsert().execute()
-        with model.database.atomic():
-            if data_source:
-                model.Community.insert_many(data_source).upsert().execute()
+            model.Community.insert(**info_dict).upsert().execute()
+        
         time.sleep(1)
 
 
@@ -354,7 +370,7 @@ def get_rent_percommunity(city, communityname):
     total_pages = misc.get_total_pages(url)
 
     if total_pages == None:
-        row = model.Rentinfo.select().count()
+        row = model.Rentinfo.select().where(model.Rentinfo.channel == channel).count()
         raise RuntimeError("Finish at %s because total_pages is None" % row)
 
     for page in range(total_pages):
@@ -432,80 +448,100 @@ def get_rent_percommunity(city, communityname):
 
 
 def get_house_perregion(city, district):
-    baseUrl = u"http://%s.lianjia.com/" % (city)
-    url = baseUrl + u"ershoufang/%s/" % district
-    source_code = misc.get_source_code(url)
-    soup = BeautifulSoup(source_code, 'lxml')
+    baseUrl = u"http://%s.esf.fang.com" % (city)
+
+    district = convert_district_for_house(baseUrl, district)
+
+    url = baseUrl + u"/%s/" % district
+    source_code = get_source_code(url)
+
+    soup = BeautifulSoup(source_code, 'lxml', from_encoding='gb18030')
     if check_block(soup):
         return
-    total_pages = misc.get_total_pages(url)
+
+    total_pages = get_total_pages(url)
     if total_pages == None:
-        row = model.Houseinfo.select().count()
+        row = model.Houseinfo.select.where(model.Houseinfo.channel == channel).count()
         raise RuntimeError("Finish at %s because total_pages is None" % row)
 
     for page in range(total_pages):
         if page > 0:
-            url_page = baseUrl + u"ershoufang/%s/pg%d/" % (district, page)
-            source_code = misc.get_source_code(url_page)
-            soup = BeautifulSoup(source_code, 'lxml')
+            url_page = baseUrl + u"/%s/i3%d/" % (district, page + 1)
+            logging.info(url_page)
+            source_code = get_source_code(url_page)
+            soup = BeautifulSoup(source_code, 'lxml',  from_encoding='gb18030')
         i = 0
+
         logging.log_progress("GetHouseByRegionlist", district, page + 1, total_pages)
         data_source = []
         hisprice_data_source = []
-        for ultag in soup.findAll("ul", {"class": "sellListContent"}):
-            for name in ultag.find_all('li'):
+        for ultag in soup.findAll("div", {"class": "shop_list"}):
+            for name in ultag.select('dl[data-bg]'):
                 i = i + 1
                 info_dict = {}
+                metadata = {}
                 try:
-                    housetitle = name.find("div", {"class": "title"})
-                    info_dict.update(
-                        {u'title': housetitle.a.get_text().strip()})
-                    info_dict.update({u'link': housetitle.a.get('href')})
-                    houseID = housetitle.a.get('data-housecode')
-                    info_dict.update({u'houseID': houseID})
+                    housetitle = name.find("span", {"class": "tit_shop"}).find_parent()
 
-                    houseinfo = name.find("div", {"class": "houseInfo"})
+                    info_dict.update(
+                        {u'title': housetitle.get('title')})
+                    info_dict.update({u'link': 'https://wuhan.esf.fang.com' + housetitle.get('href')})
+
+                    houseJson = json.loads(name.get('data-bg'))
+
+                    info_dict.update({u'houseID': houseJson['houseid']})
+     
+                    houseinfo = name.find("p", {"class": "tel_shop"})
+
                     info = houseinfo.get_text().split('|')
 
                     info_dict.update({u'housetype': info[0]})
                     info_dict.update({u'square': info[1]})
-                    info_dict.update({u'direction': info[2]})
-                    info_dict.update({u'decoration': info[3]})
-                    info_dict.update({u'floor': info[4]})
-                    info_dict.update({u'years': info[5]})
+                    info_dict.update({u'direction': info[3]})
+                    info_dict.update({u'floor': info[2]})
+                    info_dict.update({u'years': info[4]})
+                   
+                    image = name.find("img")
+                    info_dict.update({u'image': image.get('src')})
 
-                    image = name.find("img", {"class": "lj-lazy"})
-                    info_dict.update({u'image': image.get('data-original')})
+                    positionInfo = name.find("p", {"class": "add_shop"})
+                    info_dict.update({u'community': positionInfo.a.get('title')})
+                    communityInfo = positionInfo.a
+                    if communityInfo != None:
+                        communityHref = communityInfo.get('href');
+                        communityId = communityHref.lstrip('/')
+                        if len(communityId) > 0:
+                            info_dict.update({u'communityId': communityId})
 
-                    positionInfo = name.find("div", {"class": "positionInfo"})
-                    info_dict.update({u'community': positionInfo.get_text().strip()})
-                    regionInfo = positionInfo.find("a", {"data-el": "region"})
-                    if regionInfo != None:
-                        regionHref = regionInfo.get('href');
-                        communityIdRe = re.findall('\d+', str(regionHref))
-                        if len(communityIdRe) > 0:
-                            info_dict.update({u'communityId': communityIdRe[0]})
+                    metadata.update(
+                        {u'address': positionInfo.find('span').get_text().strip()})        
 
-                    followInfo = name.find("div", {"class": "followInfo"})
-                    info_dict.update(
-                        {u'followInfo': followInfo.get_text().strip()})
-
-                    taxfree = name.find("span", {"class": "taxfree"})
+                    taxfree = name.find("span", {"class": "colorPink"})
                     if taxfree == None:
                         info_dict.update({u"taxtype": ""})
                     else:
                         info_dict.update(
                             {u"taxtype": taxfree.get_text().strip()})
+                    
+                    address_dt = name.find("span", {"class": "icon_dt"})
+                    if address_dt != None:
+                        metadata.update(
+                            {u'address_dt': address_dt.get_text().strip()})                
 
-                    totalPrice = name.find("div", {"class": "totalPrice"})
+                    totalPrice = name.find("dd", {"class": "price_right"})
+
                     info_dict.update(
-                        {u'totalPrice': totalPrice.span.get_text()})
+                        {u'totalPrice': totalPrice.find('b').get_text()})
 
-                    unitPrice = name.find("div", {"class": "unitPrice"})
-                    info_dict.update(
-                        {u'unitPrice': unitPrice.get("data-price")})
-
+                    unitPrice = totalPrice.findAll("span")
+                    if unitPrice != None and len(unitPrice) > 0:
+                        unitPriceText = unitPrice[len(unitPrice) - 1].get_text()
+                        unitPriceRe = re.findall('\d+', unitPriceText)
+                        if len(unitPriceRe) > 0:
+                            info_dict.update({u'unitPrice': str(unitPriceRe[0])})
+                  
                     info_dict.update({u'channel': channel})
+                    info_dict.update({u'metadata': json.dumps(metadata)})
                 except:
                     continue
 
@@ -520,8 +556,8 @@ def get_house_perregion(city, district):
             if data_source:
                 model.Houseinfo.insert_many(data_source).upsert().execute()
             if hisprice_data_source:
-                model.Hisprice.insert_many(
-                    hisprice_data_source).upsert().execute()
+                model.Hisprice.insert_many(hisprice_data_source).upsert().execute()
+
         time.sleep(1)
 
 
@@ -534,7 +570,7 @@ def get_rent_perregion(city, district):
         return
     total_pages = misc.get_total_pages(url)
     if total_pages == None:
-        row = model.Rentinfo.select().count()
+        row = model.Rentinfo.select().where(model.Rentinfo.channel == channel).count()
         raise RuntimeError("Finish at %s because total_pages is None" % row)
 
     for page in range(total_pages):
@@ -591,6 +627,7 @@ def get_rent_perregion(city, district):
                             {u'heating': heating.span.get_text().strip()})
 
                     price = name.find("div", {"class": "price"})
+                    logging.info(price)
                     info_dict.update(
                         {u'price': int(price.span.get_text().strip())})
 
@@ -611,41 +648,41 @@ def get_rent_perregion(city, district):
 
 
 def get_communityinfo_by_url(url):
-    source_code = misc.get_source_code(url)
-    soup = BeautifulSoup(source_code, 'lxml')
+    source_code = misc.get_source_code(urlUtil.toHttpUrl(url))
+    soup = BeautifulSoup(source_code, 'lxml', from_encoding='gb18030')
 
     if check_block(soup):
         return
 
-    communityinfos = soup.findAll("div", {"class": "xiaoquInfoItem"})
+    communityinfos = soup.find("div", {"class": "Rinfolist"}).findAll('li')
     res = {}
     for info in communityinfos:
         key_type = {
             u"建筑年代": u'year',
             u"建筑类型": u'housetype',
-            u"物业费用": u'cost',
             u"物业公司": u'service',
             u"开发商": u'company',
             u"楼栋总数": u'building_num',
             u"房屋总数": u'house_num',
         }
         try:
-            key = info.find("span", {"xiaoquInfoLabel"})
-            value = info.find("span", {"xiaoquInfoContent"})
+            key = info.find("b")
             key_info = key_type[key.get_text().strip()]
-            value_info = value.get_text().strip()
+            value_info = info.get_text().strip()
             res.update({key_info: value_info})
+
+            res.update({u'id': soup.find('input', {'id' : 'projCode'}).get('value')})
 
         except:
             continue
 
-    thumbnail = soup.find("ol", {"id": "overviewThumbnail"})
+    thumbnail = soup.find("ul", {"id": "imageShowSmall"})
     images = []
     if thumbnail != None:
         for li in thumbnail.find_all('li'):
             try:
-                image = li.get("data-src")
-                images.append(image)
+                image = li.find('img')
+                images.append(image.get('src'))
             except:
                 continue
             
@@ -661,3 +698,108 @@ def check_block(soup):
             "Lianjia block your ip, please verify captcha manually at lianjia.com")
         return True
     return False
+
+
+def get_total_pages(url):
+    source_code = get_source_code(url)
+    soup = BeautifulSoup(source_code, 'lxml', from_encoding='gb18030')
+    total_pages = 0
+    logging.info('url1:' + url)
+    try:
+        page_info = soup.find('div', {'class': 'page_al'})
+        if page_info == None:
+            if soup.find('div', {'class': 'fanye'}):
+                page_info = soup.find('div', {'class': 'fanye'}).findAll('span')
+        else:
+            page_info = page_info.findAll('p')
+
+        if page_info != None:
+            pagetext = page_info[len(page_info)-1].get_text();
+            pagere = re.findall('\d+', pagetext)
+            if len(pagere) > 0:
+                total_pages = int(pagere[0])
+        else:
+            page_info = soup.find('a', {'id' :'ctl00_hlk_last'})
+            # 处理成交页面的页码
+            if url.find('chengjiao'):
+                if page_info != None:
+                    href = page_info.get('href')
+                    matchResult = re.match('http:|https:|\/\/(.*)\.fang.com(.*)\/-p1(\d+)-t11(.*)', href, re.M |re.I)
+                    if matchResult:
+                        total_pages = int(matchResult[2])
+                else:
+                    dealPageWarp = soup.find('div', {'class': 'dealPagewrap'})
+                    if dealPageWarp != None and dealPageWarp.find('a', {'class': 'selected'}):
+                        total_pages = 1
+                    else:
+                        # 即使没有记录，也设置为1页，因为下面页码为1的时候，会设置成50页
+                        total_pages = 1
+                
+    except AttributeError as e:
+        page_info = None
+
+    logging.info(str(total_pages))
+
+    # if it doesnot get total page, then return default value 50
+    if page_info == None and total_pages == 0:
+        return 50
+
+    return total_pages
+
+def get_source_code(url):
+    source_code = misc.get_source_code(url)
+    redirecturl = if_redirect_page(source_code)
+
+    if redirecturl != False:
+        source_code = misc.get_source_code(redirecturl)
+
+    return source_code
+
+def if_redirect_page(source_code):
+    soup = BeautifulSoup(source_code, 'lxml')
+    title = soup.find('head').find('title').get_text();
+    logging.debug("title: " + title)
+
+    if title.find(u'跳转') >=0:
+        redirectBtn = soup.find('a', {"class": 'btn-redir'})
+        if redirectBtn != None:
+            return redirectBtn.get('href')
+    return False
+
+def convert_district_for_house(url, district):
+    source_code = get_source_code(url)
+    soup = BeautifulSoup(source_code, 'lxml', from_encoding='gb18030')
+   
+    try:
+        screenList = soup.find('div', {'class': 'screen_al'}).findAll('li')
+        for screen in screenList:
+            screenTitle = screen.find('span', {'class': 'screen_title'})
+            if screenTitle != None and screenTitle.get_text() == u'区域':
+                for tag in screen.findAll('li'):
+                    item = tag.a
+                    if item.get_text() ==  district:
+                        districtId = item.get('href').lstrip('/')
+                        return districtId
+    
+    except Exception as e:
+        logging.error(e)
+
+    raise RuntimeError("未找到指定对应区域 { %s } 的ID" % district)
+
+def convert_district_for_community(url, district):
+    source_code = get_source_code(url)
+    soup = BeautifulSoup(source_code, 'lxml', from_encoding='gb18030')
+   
+    try:
+        screen = soup.find('div', {'class': 'quxian'})
+        screenTitle = screen.find('span', {'class': 'type'})
+        if screenTitle != None and screenTitle.get_text().lstrip(u'：').find(u'区域') > -1:
+            for item in screen.find('div', "qxName").findAll('a'):
+                if item.get_text() ==  district:
+                    districtId = item.get('href').lstrip('/housing').strip('/')
+                    return districtId
+    
+    except Exception as e:
+        logging.error(e)
+
+    raise RuntimeError("未找到指定对应区域 { %s } 的ID" % district)

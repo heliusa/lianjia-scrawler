@@ -7,6 +7,7 @@ import datetime
 import urllib2
 import re
 from util.log import Log
+import traceback
 
 logging = Log()
 
@@ -88,10 +89,10 @@ def GetRentByRegionlist(city, regionlist=[u'xicheng']):
     logging.end()
 
 
-def get_house_percommunity(city, communityname):
+def get_house_percommunity(city, community):
     baseUrl = u"http://%s.lianjia.com/" % (city)
     url = baseUrl + u"ershoufang/rs" + \
-        urllib2.quote(communityname.encode('utf8')) + "/"
+        urllib2.quote(community.title.encode('utf8')) + "/"
     source_code = misc.get_source_code(url)
     soup = BeautifulSoup(source_code, 'lxml')
 
@@ -100,21 +101,21 @@ def get_house_percommunity(city, communityname):
     total_pages = misc.get_total_pages(url)
 
     if total_pages == None:
-        row = model.Houseinfo.select().count()
+        row = model.Houseinfo.select().where(model.Houseinfo.channel == channel).count()
         raise RuntimeError("Finish at %s because total_pages is None" % row)
 
     for page in range(total_pages):
         if page > 0:
             url_page = baseUrl + \
                 u"ershoufang/pg%drs%s/" % (page,
-                                           urllib2.quote(communityname.encode('utf8')))
+                                           urllib2.quote(community.title.encode('utf8')))
             source_code = misc.get_source_code(url_page)
             soup = BeautifulSoup(source_code, 'lxml')
 
         nameList = soup.findAll("li", {"class": "clear"})
         i = 0
         logging.log_progress("GetHouseByCommunitylist",
-                     communityname, page + 1, total_pages)
+                     community.title, page + 1, total_pages)
         data_source = []
         hisprice_data_source = []
         for name in nameList:  # per house loop
@@ -127,7 +128,7 @@ def get_house_percommunity(city, communityname):
 
                 houseaddr = name.find("div", {"class": "address"})
                 info = houseaddr.div.get_text().split('|')
-                info_dict.update({u'community': communityname})
+                info_dict.update({u'community': community.title})
                 info_dict.update({u'housetype': info[1].strip()})
                 info_dict.update({u'square': info[2].strip()})
                 info_dict.update({u'direction': info[3].strip()})
@@ -158,7 +159,7 @@ def get_house_percommunity(city, communityname):
             # houseinfo insert into mysql
             data_source.append(info_dict)
             hisprice_data_source.append(
-                {"houseID": info_dict["houseID"], "totalPrice": info_dict["totalPrice"]})
+                {"houseID": info_dict["houseID"], "totalPrice": info_dict["totalPrice"], "channel": channel})
             # model.Houseinfo.insert(**info_dict).upsert().execute()
             #model.Hisprice.insert(houseID=info_dict['houseID'], totalPrice=info_dict['totalPrice']).upsert().execute()
 
@@ -171,10 +172,10 @@ def get_house_percommunity(city, communityname):
         time.sleep(1)
 
 
-def get_sell_percommunity(city, communityname):
+def get_sell_percommunity(city, community):
     baseUrl = u"http://%s.lianjia.com/" % (city)
     url = baseUrl + u"chengjiao/rs" + \
-        urllib2.quote(communityname.encode('utf8')) + "/"
+        urllib2.quote(community.title.encode('utf8')) + "/"
     source_code = misc.get_source_code(url)
     soup = BeautifulSoup(source_code, 'lxml')
 
@@ -183,19 +184,19 @@ def get_sell_percommunity(city, communityname):
     total_pages = misc.get_total_pages(url)
 
     if total_pages == None:
-        row = model.Sellinfo.select().count()
+        row = model.Sellinfo.select().where(model.Sellinfo.channel == channel).count()
         raise RuntimeError("Finish at %s because total_pages is None" % row)
 
     for page in range(total_pages):
         if page > 0:
             url_page = baseUrl + \
                 u"chengjiao/pg%drs%s/" % (page,
-                                          urllib2.quote(communityname.encode('utf8')))
+                                          urllib2.quote(community.title.encode('utf8')))
             source_code = misc.get_source_code(url_page)
             soup = BeautifulSoup(source_code, 'lxml')
 
         logging.log_progress("GetSellByCommunitylist",
-                     communityname, page + 1, total_pages)
+                     community.title, page + 1, total_pages)
         data_source = []
         for ultag in soup.findAll("ul", {"class": "listContent"}):
             for name in ultag.find_all('li'):
@@ -209,7 +210,7 @@ def get_sell_percommunity(city, communityname):
                     info_dict.update({u'houseID': houseID.strip()})
 
                     house = housetitle.get_text().strip().split(' ')
-                    info_dict.update({u'community': communityname})
+                    info_dict.update({u'community': community.title})
                     info_dict.update(
                         {u'housetype': house[1].strip() if 1 < len(house) else ''})
                     info_dict.update(
@@ -274,7 +275,7 @@ def get_community_perregion(city, regionname=u'xicheng'):
     total_pages = misc.get_total_pages(url)
 
     if total_pages == None:
-        row = model.Community.select().count()
+        row = model.Community.select().where(model.Community.channel == channel).count()
         raise RuntimeError("Finish at %s because total_pages is None" % row)
 
     for page in range(total_pages):
@@ -354,7 +355,7 @@ def get_rent_percommunity(city, communityname):
     total_pages = misc.get_total_pages(url)
 
     if total_pages == None:
-        row = model.Rentinfo.select().count()
+        row = model.Rentinfo.select().where(model.Rentinfo.channel == channel).count()
         raise RuntimeError("Finish at %s because total_pages is None" % row)
 
     for page in range(total_pages):
@@ -436,11 +437,12 @@ def get_house_perregion(city, district):
     url = baseUrl + u"ershoufang/%s/" % district
     source_code = misc.get_source_code(url)
     soup = BeautifulSoup(source_code, 'lxml')
+
     if check_block(soup):
         return
     total_pages = misc.get_total_pages(url)
     if total_pages == None:
-        row = model.Houseinfo.select().count()
+        row = model.Houseinfo.select().where(model.Houseinfo.channel == channel).count()
         raise RuntimeError("Finish at %s because total_pages is None" % row)
 
     for page in range(total_pages):
@@ -534,7 +536,7 @@ def get_rent_perregion(city, district):
         return
     total_pages = misc.get_total_pages(url)
     if total_pages == None:
-        row = model.Rentinfo.select().count()
+        row = model.Rentinfo.select().where(model.Rentinfo.channel == channel).count()
         raise RuntimeError("Finish at %s because total_pages is None" % row)
 
     for page in range(total_pages):

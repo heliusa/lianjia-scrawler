@@ -2,7 +2,6 @@ from peewee import *
 import datetime
 import settings
 
-
 if settings.DBENGINE.lower() == 'mysql':
     database = MySQLDatabase(
         settings.DBNAME,
@@ -38,13 +37,13 @@ class BaseModel(Model):
 
 
 class Community(BaseModel):
-    id = BigIntegerField(primary_key=True)
+    id = CharField(max_length=128)
     title = CharField()
-    link = CharField(unique=True)
-    district = CharField()
-    bizcircle = CharField()
-    tagList = CharField()
-    onsale = CharField()
+    link = CharField()
+    district = CharField(null=True)
+    bizcircle = CharField(null=True)
+    tagList = CharField(null=True, max_length=1000)
+    onsale = CharField(null=True)
     onrent = CharField(null=True)
     year = CharField(null=True)
     housetype = CharField(null=True)
@@ -60,14 +59,16 @@ class Community(BaseModel):
     channel = CharField()
     metadata = TextField(null=True)
     validdate = DateTimeField(default=datetime.datetime.now)
+    class Meta:
+        primary_key = CompositeKey('id', 'channel')
 
 
 class Houseinfo(BaseModel):
-    houseID = CharField(primary_key=True)
+    houseID = CharField()
     title = CharField()
     link = CharField()
     community = CharField()
-    communityId = BigIntegerField(null=True)
+    communityId = CharField(null=True, max_length=128)
     years = CharField()
     housetype = CharField()
     square = CharField()
@@ -83,16 +84,19 @@ class Houseinfo(BaseModel):
     channel = CharField()
     metadata = TextField(null = True)
     validdate = DateTimeField(default=datetime.datetime.now)
+    class Meta:
+        primary_key = CompositeKey('houseID', 'channel')
 
 
 class Hisprice(BaseModel):
     houseID = CharField()
     totalPrice = CharField()
     date = DateTimeField(default=datetime.datetime.now)
+    channel = CharField()
     metadata = TextField(null = True)
 
     class Meta:
-        primary_key = CompositeKey('houseID', 'totalPrice')
+        primary_key = CompositeKey('houseID', 'totalPrice', 'channel')
 
 
 class Sellinfo(BaseModel):
@@ -100,7 +104,7 @@ class Sellinfo(BaseModel):
     title = CharField()
     link = CharField()
     community = CharField()
-    communityId = BigIntegerField(null=True)
+    communityId = CharField(null=True, max_length=128)
     years = CharField()
     housetype = CharField()
     square = CharField()
