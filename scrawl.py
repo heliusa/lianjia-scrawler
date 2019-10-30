@@ -21,7 +21,7 @@ if __name__ == "__main__":
     
     moduleList = []
 
-    options, args = getopt.getopt(sys.argv[1:], 'c:m')
+    options, args = getopt.getopt(sys.argv[1:], 'c:m:')
     logging.info(options)
 
     for opt, value in options:
@@ -43,7 +43,7 @@ if __name__ == "__main__":
         raise LookupError('Channel parameter is wrong!')
 
     logging.info(settings.CHANNEL_PARAM[chstr]);
-    
+
     regionlist = settings.CHANNEL_PARAM[chstr]['REGIONLIST']  # only pinyin support
     city = settings.CHANNEL_PARAM[chstr]['CITY']
 
