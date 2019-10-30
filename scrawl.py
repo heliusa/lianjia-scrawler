@@ -3,6 +3,7 @@ import model
 import settings
 import sys
 from util.log import Log
+import getopt
 
 logging = Log()
 
@@ -15,30 +16,48 @@ def get_communitylist(channel, city):
 if __name__ == "__main__":
     args  = sys.argv
     ch = lianjia
+    module = 'full'
     chstr = 'lianjia'
-    if len(args) > 1:
-        chstr = args[1]
-        if chstr == 'fang':
-            ch = fang
-        elif chstr == 'lianjia':
-            ch = lianjia    
-        else:
-            raise LookupError('Channel parameter is wrong!')
-        
-        logging.info("Channel is %s", chstr)
-    else:
-        logging.info("Channel is lianjia")    
+    
+    moduleList = []
 
+    options, args = getopt.getopt(sys.argv[1:], 'c:m')
+    logging.info(options)
+
+    for opt, value in options:
+        if opt in ("-c"):  
+            chstr = value
+        if opt in ("-m"):  
+            moduleList.append(value)
+
+    if len(moduleList) == 0:
+        moduleList = ['house', 'rent', 'community', 'sell']
+
+    logging.info("Channel is %s", chstr)
+
+    if chstr == 'fang':
+        ch = fang
+    elif chstr == 'lianjia':
+        ch = lianjia
+    else:
+        raise LookupError('Channel parameter is wrong!')
 
     logging.info(settings.CHANNEL_PARAM[chstr]);
+    
     regionlist = settings.CHANNEL_PARAM[chstr]['REGIONLIST']  # only pinyin support
     city = settings.CHANNEL_PARAM[chstr]['CITY']
-    #model.database_init()
-    ch.GetHouseByRegionlist(city, regionlist)
-    #ch.GetRentByRegionlist(city, regionlist)
+
+    if 'init' in moduleList:
+        model.database_init()
+    if 'house' in moduleList:
+        ch.GetHouseByRegionlist(city, regionlist)
+    if 'rent' in moduleList:
+        ch.GetRentByRegionlist(city, regionlist)
     # Init,scrapy celllist and insert database; could run only 1st time
-    ch.GetCommunityByRegionlist(city, regionlist)
+    if 'community' in moduleList:
+        ch.GetCommunityByRegionlist(city, regionlist)
     communitylist = get_communitylist(chstr, city)  # Read celllist from database
-    ch.GetSellByCommunitylist(city, communitylist)
+    if 'sell' in moduleList:
+        ch.GetSellByCommunitylist(city, communitylist)
 
 
