@@ -315,6 +315,7 @@ def get_community_perregion(city, regionname=u'xicheng'):
                     isAbsoluteUrl = True
                     info_dict.update({u'link': link})
                 else:
+                    logging.info('Get Community pass, link:' + link)
                     continue
 
                 districtInfo = communitytitle.find_parent().find_next_sibling('p')
@@ -354,11 +355,13 @@ def get_community_perregion(city, regionname=u'xicheng'):
 
                 info_dict.update({u'city': city})
 
+                # communityinfo insert into mysql
+                model.Community.insert(**info_dict).upsert().execute()
+
             except:
+                logging.error('Get Community error: ' + communitytitle)
+                logging.error(info_dict)
                 continue
-            # communityinfo insert into mysql
-            data_source.append(info_dict)
-            model.Community.insert(**info_dict).upsert().execute()
         
         time.sleep(1)
 
