@@ -752,8 +752,11 @@ def get_source_code(url):
     source_code = misc.get_source_code(url)
     redirecturl = if_redirect_page(source_code)
 
+    logging.info('request url: ' + url)
+
     if redirecturl != False:
         source_code = misc.get_source_code(redirecturl)
+        logging.info('request redirect: ' + redirecturl)
 
     return source_code
 
