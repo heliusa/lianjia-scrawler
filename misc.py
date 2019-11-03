@@ -6,6 +6,9 @@ import threading
 from six.moves import urllib
 import socket
 
+from util.log import Log
+logging = Log()
+
 hds = [{'User-Agent': 'Mozilla/5.0 (Windows; U; Windows NT 6.1; en-US; rv:1.9.1.6) Gecko/20091201 Firefox/3.5.6'},
        {'User-Agent': 'Mozilla/5.0 (Windows NT 6.2) AppleWebKit/535.11 (KHTML, like Gecko) Chrome/17.0.963.12 Safari/535.11'},
        {'User-Agent': 'Mozilla/5.0 (compatible; MSIE 10.0; Windows NT 6.2; Trident/6.0)'},
@@ -34,10 +37,17 @@ hd = {
 }
 
 
-def get_source_code(url):
+def get_source_code(url, options = {}):
     try:
+        headers = hds[random.randint(0, len(hds) - 1)]
+        if options and options['headers']:
+            for attr, value in options['headers'].items():
+                headers[attr] = value
+        
+        #logging.info(headers)
+
         result = requests.get(
-            url, headers=hds[random.randint(0, len(hds) - 1)])
+            url, headers=headers)
         #result = requests.get(url)
         source_code = result.content
     except Exception as e:

@@ -11,6 +11,7 @@ from util.log import Log
 import base64
 from util import urlUtil
 import traceback
+import chardet
 
 logging = Log()
 
@@ -286,14 +287,23 @@ def get_community_perregion(city, regionname=u'xicheng'):
         row = model.Community.select().where(model.Community.channel == channel).count()
         raise RuntimeError("Finish at %s because total_pages is None" % row)
 
+    prevUrl = url
     for page in range(total_pages):
+        if page > 2:
+            continue
         if page > 0:
             params = regionname.split('_')
             if len(params) > 4:
                 params[len(params)-4] = str(page + 1)
-    
+
             url_page = baseUrl +  '_'.join(params) + '/'
-            source_code = get_source_code(url_page)
+            source_code = get_source_code(url_page, {
+                # 'headers' : {
+                #     'referer': prevUrl
+                # }
+            })
+            prevUrl = url_page
+           
             soup = BeautifulSoup(source_code, 'lxml', from_encoding='gb18030')
 
         nameList = soup.findAll("div", {"class": "list"})
@@ -310,9 +320,7 @@ def get_community_perregion(city, regionname=u'xicheng'):
                 link = communitytitle.get('href')
                 info_dict.update({u'title': title})
 
-                isAbsoluteUrl = False
                 if link.startswith('http') or link.startswith('https') or link.startswith('//'):
-                    isAbsoluteUrl = True
                     info_dict.update({u'link': link})
                 else:
                     logging.info('Get Community pass, link:' + link)
@@ -339,7 +347,6 @@ def get_community_perregion(city, regionname=u'xicheng'):
                 info_dict.update({u'year': year.get_text()})
 
                 # matchResult = re.match('http:|https:|\/\/(.*)\.fang.com.*', link, re.M |re.I)
-               
 
                 price = name.find("p", {"class": "priceAverage"})
                 info_dict.update({u'price': price.span.get_text().strip('\n')})
@@ -359,7 +366,7 @@ def get_community_perregion(city, regionname=u'xicheng'):
                 model.Community.insert(**info_dict).upsert().execute()
 
             except:
-                logging.error('Get Community error: ' + communitytitle)
+                logging.error('Get Community error: ' + title)
                 logging.error(info_dict)
                 continue
         
@@ -517,7 +524,7 @@ def get_house_perregion(city, district):
                     communityInfo = positionInfo.a
                     if communityInfo != None:
                         communityHref = communityInfo.get('href');
-                        communityId = communityHref.lstrip('/')
+                        communityId = communityHref.strip('/')
                         if len(communityId) > 0:
                             info_dict.update({u'communityId': communityId})
 
@@ -679,7 +686,18 @@ def get_communityinfo_by_url(url):
             value_info = info.get_text().strip()
             res.update({key_info: value_info})
 
-            res.update({u'id': soup.find('input', {'id' : 'projCode'}).get('value')})
+            projCode = soup.find('input', {'id' : 'projCode'})
+            if projCode: 
+                res.update({u'id': projCode.get('value')})
+            else:
+                paiming = soup.find('div', {'class': 'paiming'})
+                if paiming:
+                    loupan = paiming.find('a').find_next_sibling()
+                    if loupan:
+                        href = loupan.get('href')
+                        matchResult = re.match('http:|https:|\/\/(.*)\.fang.com\/office\/photo\/(\d+).html(.*)', href, re.M |re.I)
+                        if matchResult:
+                            res.update({u'id': str(matchResult[1])})
 
         except:
             continue
@@ -751,27 +769,52 @@ def get_total_pages(url):
 
     return total_pages
 
-def get_source_code(url):
-    source_code = misc.get_source_code(url)
+def get_source_code(url, options = {}):
+    source_code = misc.get_source_code(url, options)
     redirecturl = if_redirect_page(source_code)
 
-    logging.info('request url: ' + url)
+    logging.info('request url: ' + url + ', options:' + json.dumps(options))
 
     if redirecturl != False:
-        source_code = misc.get_source_code(redirecturl)
+        source_code = misc.get_source_code(redirecturl, options)
+        url = redirecturl
         logging.info('request redirect: ' + redirecturl)
+
+    trytime = 0
+    if if_captcha_page(source_code):
+        if trytime > 4:
+            message = 'request captcha many time, url: ' + url
+            logging.info(message)
+            raise RuntimeError(message)
+
+        time.sleep(2)
+        source_code = misc.get_source_code(url, options)
+        trytime = trytime + 1
 
     return source_code
 
 def if_redirect_page(source_code):
-    soup = BeautifulSoup(source_code, 'lxml')
-    title = soup.find('head').find('title').get_text();
-    logging.debug("title: " + title)
+    if source_code == None:
+        return False
 
+    soup = BeautifulSoup(source_code, 'lxml')
+    title = soup.find('head').find('title').get_text()
     if title.find(u'跳转') >=0:
         redirectBtn = soup.find('a', {"class": 'btn-redir'})
         if redirectBtn != None:
             return redirectBtn.get('href')
+    return False
+
+def if_captcha_page(source_code):
+    if source_code == None:
+        return False
+
+    soup = BeautifulSoup(source_code, 'lxml')
+    title = soup.find('head').find('title').get_text()
+
+    if title.find(u'访问验证') >=0:
+        return True
+
     return False
 
 def convert_district_for_house(url, district):
@@ -797,6 +840,7 @@ def convert_district_for_house(url, district):
 def convert_district_for_community(url, district):
     source_code = get_source_code(url)
     soup = BeautifulSoup(source_code, 'lxml', from_encoding='gb18030')
+   
     try:
         screen = soup.find('div', {'class': 'quxian'})
         screenTitle = screen.find('span', {'class': 'type'})
@@ -810,3 +854,4 @@ def convert_district_for_community(url, district):
         logging.error(e)
 
     raise RuntimeError("未找到指定对应区域 { %s } 的ID, url: %s" % (district, url))
+

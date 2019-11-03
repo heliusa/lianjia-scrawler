@@ -331,12 +331,15 @@ def get_community_perregion(city, regionname=u'xicheng'):
                     info_dict.update({key: value})
 
                 info_dict.update({u'city': city})
-                
+
+                model.Community.insert(**info_dict).upsert().execute()
+
             except:
+                logging.error('Get Community error: ' + title)
+                logging.error(info_dict)
                 continue
             # communityinfo insert into mysql
-            data_source.append(info_dict)
-            model.Community.insert(**info_dict).upsert().execute()
+          
             
         # 如果批量插入SQL会超长报错，故改成单条插入    
         # with model.database.atomic():
@@ -510,19 +513,24 @@ def get_house_perregion(city, district):
                         {u'unitPrice': unitPrice.get("data-price")})
 
                     info_dict.update({u'channel': channel})
+
+                    model.Houseinfo.insert(**info_dict).upsert().execute()
+
                 except:
+                    logging.error('Get House error: ' + housetitle)
+                    logging.error(info_dict)
                     continue
 
                 # Houseinfo insert into mysql
-                data_source.append(info_dict)
+                #data_source.append(info_dict)
                 hisprice_data_source.append(
                     {"houseID": info_dict["houseID"], "totalPrice": info_dict["totalPrice"],  "channel": channel})
                 # model.Houseinfo.insert(**info_dict).upsert().execute()
                 #model.Hisprice.insert(houseID=info_dict['houseID'], totalPrice=info_dict['totalPrice']).upsert().execute()
 
         with model.database.atomic():
-            if data_source:
-                model.Houseinfo.insert_many(data_source).upsert().execute()
+            # if data_source:
+            #     model.Houseinfo.insert_many(data_source).upsert().execute()
             if hisprice_data_source:
                 model.Hisprice.insert_many(
                     hisprice_data_source).upsert().execute()
