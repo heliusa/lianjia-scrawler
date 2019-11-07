@@ -812,6 +812,8 @@ def get_total_pages(url):
                             total_pages = 1
                     else:
                         total_pages = 1
+                else:
+                    total_pages = 1
 
                 
     except AttributeError as e:
