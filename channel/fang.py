@@ -801,10 +801,15 @@ def get_total_pages(url):
                     fanye = soup.find('div', {'class': 'fanye'})
                     if fanye: 
                         lastPageDom = fanye.find('a', {'id': 'PageControl1_hlk_last'})
-                        href = lastPageDom.get('href')
-                        matchResult = re.match('http:|https:|\/\/(.*)\.fang\.com(.*)\/chushou\/list\/(.*)-i3(\d+)', str(href), re.M |re.I)
-                        if matchResult:
-                            total_pages = int(matchResult.group(4))
+                        if lastPageDom: 
+                            href = lastPageDom.get('href')
+                            matchResult = re.match('http:|https:|\/\/(.*)\.fang\.com(.*)\/chushou\/list\/(.*)-i3(\d+)', str(href), re.M |re.I)
+                            if matchResult:
+                                total_pages = int(matchResult.group(4))
+                            else:
+                                total_pages = 1
+                        else:
+                            total_pages = 1
                     else:
                         total_pages = 1
 
