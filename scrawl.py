@@ -31,7 +31,7 @@ if __name__ == "__main__":
             moduleList.append(value)
 
     if len(moduleList) == 0:
-        moduleList = ['house', 'rent', 'community', 'sell']
+        moduleList = ['house', 'rent', 'community', 'sell', 'house_community']
 
     logging.info("Channel is %s", chstr)
 
@@ -59,5 +59,7 @@ if __name__ == "__main__":
     communitylist = get_communitylist(chstr, city)  # Read celllist from database
     if 'sell' in moduleList:
         ch.GetSellByCommunitylist(city, communitylist)
+    if 'house_community' in moduleList:
+        ch.GetHouseByCommunitylist(city, communitylist)
 
 

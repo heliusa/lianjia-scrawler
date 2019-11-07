@@ -95,16 +95,22 @@ def GetRentByRegionlist(city, regionlist=[u'xicheng']):
     logging.end()
 
 
-def get_house_percommunity(city, communityname):
-    baseUrl = u"http://%s.lianjia.com/" % (city)
-    url = baseUrl + u"ershoufang/rs" + \
-        urllib2.quote(communityname.encode('utf8')) + "/"
-    source_code = misc.get_source_code(url)
-    soup = BeautifulSoup(source_code, 'lxml')
+def get_house_percommunity(city, community):
+    
+    if not community.link:
+        logging.info("Get House By community not link %s" % community.title)
+        return
+
+    baseUrl = urlUtil.toHttpUrl(community.link) + u"chushou/"
+
+    logging.info("baseUrl: %s" % baseUrl)
+
+    source_code = get_source_code(baseUrl)
+    soup = BeautifulSoup(source_code, 'lxml', from_encoding='gb18030')
 
     if check_block(soup):
         return
-    total_pages = misc.get_total_pages(url)
+    total_pages = get_total_pages(baseUrl)
 
     if total_pages == None:
         row = model.Houseinfo.select().where(model.Houseinfo.channel == channel).count()
@@ -112,57 +118,86 @@ def get_house_percommunity(city, communityname):
 
     for page in range(total_pages):
         if page > 0:
-            url_page = baseUrl + \
-                u"ershoufang/pg%drs%s/" % (page,
-                                           urllib2.quote(communityname.encode('utf8')))
-            source_code = misc.get_source_code(url_page)
-            soup = BeautifulSoup(source_code, 'lxml')
+            url_page = (baseUrl + 'list/-h330-i3%d/') % (page + 1)
+            source_code = get_source_code(url_page)
+            soup = BeautifulSoup(source_code, 'lxml', from_encoding='gb18030')
 
-        nameList = soup.findAll("li", {"class": "clear"})
+        nameList = soup.findAll("div", {"class": "fangList"})
         i = 0
-        logging.log_progress("GetHouseByCommunitylist",
-                     communityname, page + 1, total_pages)
+        logging.log_progress("GetHouseByCommunitylist", community.title, page + 1, total_pages)
         data_source = []
         hisprice_data_source = []
         for name in nameList:  # per house loop
             i = i + 1
             info_dict = {}
             try:
-                housetitle = name.find("div", {"class": "title"})
-                info_dict.update({u'title': housetitle.a.get_text().strip()})
-                info_dict.update({u'link': housetitle.a.get('href')})
+                housetitle = name.find("p", {"class": "fangTitle"})
+                title = housetitle.a.get_text().strip()
+                info_dict.update({u'title':title})
+                link =  housetitle.a.get('href')
+                info_dict.update({u'link': link})
 
-                houseaddr = name.find("div", {"class": "address"})
-                info = houseaddr.div.get_text().split('|')
-                info_dict.update({u'community': communityname})
-                info_dict.update({u'housetype': info[1].strip()})
-                info_dict.update({u'square': info[2].strip()})
-                info_dict.update({u'direction': info[3].strip()})
-                info_dict.update({u'decoration': info[4].strip()})
+                metadata = {}
 
-                housefloor = name.find("div", {"class": "flood"})
-                floor_all = housefloor.div.get_text().split(
-                    '-')[0].strip().split(' ')
-                info_dict.update({u'floor': floor_all[0].strip()})
-                info_dict.update({u'years': floor_all[-1].strip()})
+                linkParts = link.split('_')
+                if len(linkParts) < 1:
+                    logging.info("HouseId miss, pass: %s" % title)
+                    continue
 
-                followInfo = name.find("div", {"class": "followInfo"})
-                info_dict.update({u'followInfo': followInfo.get_text()})
+                info_dict.update({u'houseID':linkParts[1]})
+    
+                houseinfo = name.find("p", {"class": "mt5"})
 
-                tax = name.find("div", {"class": "tag"})
-                info_dict.update({u'taxtype': tax.get_text().strip()})
+                info = houseinfo.get_text().split('|')
 
-                totalPrice = name.find("div", {"class": "totalPrice"})
-                info_dict.update({u'totalPrice': totalPrice.span.get_text()})
+                areaDom = name.find('ul', {"class": 'area'}).find('li')
 
-                unitPrice = name.find("div", {"class": "unitPrice"})
-                info_dict.update({u'unitPrice': unitPrice.get('data-price')})
-                info_dict.update({u'houseID': unitPrice.get('data-hid')})
+                info_dict.update({u'housetype': info[0]})
+                info_dict.update({u'square': areaDom.get_text()})
+                info_dict.update({u'direction': info[2]})
+                info_dict.update({u'floor': info[1]})
+                info_dict.update({u'years': info[3]})
+                
+                image = name.find("img")
+                info_dict.update({u'image': image.get('src')})
+
+                info_dict.update({u'community': community.title})
+                info_dict.update({u'communityId': community.id})
+
+                fangPositionicon = name.find('span', {"class": "fangPositionicon"})
+                metadata.update(
+                    {u'address': fangPositionicon.get_text().strip()})        
+
+                taxfree = name.find("span", {"class": "colorGreen"})
+                if taxfree == None:
+                    info_dict.update({u"taxtype": ""})
+                else:
+                    info_dict.update(
+                        {u"taxtype": taxfree.get_text().strip()})
+                
+                address_dt = name.find("span", {"class": "train"})
+                if address_dt != None:
+                    metadata.update(
+                        {u'address_dt': address_dt.get_text().strip()})                
+
+                totalPrice = name.find("span", {"class": "num"})
+
+                info_dict.update(
+                    {u'totalPrice': totalPrice.get_text()})
+
+                unitPrice = name.find("li",{"class": "update"})
+                if unitPrice != None:
+                    unitPriceRe = re.findall('\d+', unitPrice.get_text())
+                    if len(unitPriceRe) > 0:
+                        info_dict.update({u'unitPrice': str(unitPriceRe[0])})
                 
                 info_dict.update({u'channel': channel})
+                info_dict.update({u'metadata': json.dumps(metadata)})
+                
             except:
                 continue
             # houseinfo insert into mysql
+                    
             data_source.append(info_dict)
             hisprice_data_source.append(
                 {"houseID": info_dict["houseID"], "totalPrice": info_dict["totalPrice"], "channel": channel})
@@ -730,28 +765,29 @@ def get_total_pages(url):
     source_code = get_source_code(url)
     soup = BeautifulSoup(source_code, 'lxml', from_encoding='gb18030')
     total_pages = 0
+   
     try:
         page_info = soup.find('div', {'class': 'page_al'})
+        
         if page_info == None:
             if soup.find('div', {'class': 'fanye'}):
                 page_info = soup.find('div', {'class': 'fanye'}).findAll('span')
         else:
             page_info = page_info.findAll('p')
-
-        if page_info != None:
+       
+        if page_info != None and len(page_info) > 0:
             pagetext = page_info[len(page_info)-1].get_text();
             pagere = re.findall('\d+', pagetext)
             if len(pagere) > 0:
                 total_pages = int(pagere[0])
         else:
-            page_info = soup.find('a', {'id' :'ctl00_hlk_last'})
-            # 处理成交页面的页码
-            if url.find('chengjiao'):
+            if url.find('chengjiao') > -1:  # 处理成交页面的页码
+                page_info = soup.find('a', {'id' :'ctl00_hlk_last'})
                 if page_info != None:
                     href = page_info.get('href')
-                    matchResult = re.match('http:|https:|\/\/(.*)\.fang.com(.*)\/-p1(\d+)-t11(.*)', href, re.M |re.I)
+                    matchResult = re.match('http:|https:|\/\/(.*)\.fang\.com(.*)\/-p1(\d+)-t11(.*)', href, re.M |re.I)
                     if matchResult:
-                        total_pages = int(matchResult[2])
+                        total_pages = int(matchResult.group(4))
                 else:
                     dealPageWarp = soup.find('div', {'class': 'dealPagewrap'})
                     if dealPageWarp != None and dealPageWarp.find('a', {'class': 'selected'}):
@@ -759,6 +795,19 @@ def get_total_pages(url):
                     else:
                         # 即使没有记录，也设置为1页，因为下面页码为1的时候，会设置成50页
                         total_pages = 1
+            else:
+                mark = soup.find('div', {'class' :'rentListwrap'})
+                if mark: # 小区出售页面：
+                    fanye = soup.find('div', {'class': 'fanye'})
+                    if fanye: 
+                        lastPageDom = fanye.find('a', {'id': 'PageControl1_hlk_last'})
+                        href = lastPageDom.get('href')
+                        matchResult = re.match('http:|https:|\/\/(.*)\.fang\.com(.*)\/chushou\/list\/(.*)-i3(\d+)', str(href), re.M |re.I)
+                        if matchResult:
+                            total_pages = int(matchResult.group(4))
+                    else:
+                        total_pages = 1
+
                 
     except AttributeError as e:
         page_info = None
