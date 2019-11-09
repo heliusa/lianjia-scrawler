@@ -62,30 +62,26 @@ def get_source_code(url, options = {}):
             else:
                 proxies = options['proxy']
 
-        result = requests.get(
-            url, headers=headers, proxies=proxies, timeout=5)
+        source_code = None
+        re_conn_times = 5
+        
+        for cnt in range(re_conn_times):
+            try:
+                result = requests.get(
+                url, headers=headers, proxies=proxies, timeout=5)
 
-        if result.status_code < 400:
-            source_code = result.content
-        else:
-            raise ProxyError()
-     
-    except (ProxyError, ConnectTimeout, ReadTimeout):
-
-        if options and options.has_key('proxy_retry'):
-            if options['proxy_retry']< 5:
-                options['proxy_retry'] = options['proxy_retry']+1
-                logging.error("Request proxy error retry %d times: %s" % (options['proxy_retry'], url))
-                return get_source_code(url, options)
-            else:
-                logging.error("Request abandon after proxy error %d times: %s" % (options['proxy_retry'], url))
-                return
-        else:
-            if not options:
-                options = {}
-            options['proxy_retry'] = 1
-            logging.error("Request proxy error retry %d times: %s" % (options['proxy_retry'], url))
-            return get_source_code(url, options)
+                if result.status_code >=400:
+                    continue
+                
+                source_code = result.content
+                break
+            except Exception:
+                result = None
+                logging.error("Request error retry %d times: %s" % (cnt + 1, url))
+                if proxies:
+                    #发生异常的时候，切换代理
+                    proxies = get_proxy()
+                continue
 
     except Exception as e:
         traceback.print_exc()
@@ -97,7 +93,6 @@ def get_source_code(url, options = {}):
 def get_total_pages(url):
     source_code = get_source_code(url)
     soup = BeautifulSoup(source_code, 'lxml')
-    total_pages = 0
     try:
         page_info = soup.find('div', {'class': 'page-box house-lst-page-box'})
     except AttributeError as e:
@@ -115,10 +110,9 @@ def get_total_pages(url):
 def get_sh_total_pages(url):
     source_code = get_source_code(url)
     soup = BeautifulSoup(source_code, 'lxml')
-    total_pages = 0
     try:
         page_info = soup.find('a', {'gahref': 'results_totalpage'})
-    except AttributeError as e:
+    except AttributeError:
         page_info = None
 
     if page_info == None:
@@ -166,10 +160,8 @@ def test_proxyip_thread(i):
         source_cod = urllib.request.urlopen(res, timeout=10).read()
         if source_cod.find(b'\xe6\x82\xa8\xe6\x89\x80\xe5\x9c\xa8\xe7\x9a\x84IP') == -1:
             proxys.append(proxys_src[i])
-    except Exception as e:
+    except Exception:
         return
-       # print(e)
-
 
 def test_proxyip():
     print("proxys before:" + str(len(proxys_src)))

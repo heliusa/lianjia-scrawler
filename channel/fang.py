@@ -28,7 +28,7 @@ def GetHouseByCommunitylist(city, communitylist):
         except Exception as e:
             traceback.print_exc()
             logging.error(community.title + " Fail")
-            pass
+            continue
 
     tracking.end()
 
@@ -40,7 +40,7 @@ def GetSellByCommunitylist(city, communitylist):
         except Exception as e:
             logging.error(e)
             logging.error(community.title + " Fail")
-            pass
+            continue
     tracking.end()
 
 def GetRentByCommunitylist(city, communitylist):
@@ -80,6 +80,7 @@ def GetHouseByRegionlist(city, regionlist=[u'xicheng']):
             get_house_perregion(city, regionname)
         except Exception as e:
             logging.error(e)
+            traceback.print_exc()
             pass
     tracking.end()
 
@@ -118,100 +119,105 @@ def get_house_percommunity(city, community):
         raise RuntimeError("Finish at %s because total_pages is None" % row)
 
     for page in range(total_pages):
-        if page > 0:
-            url_page = (baseUrl + 'list/-h330-i3%d/') % (page + 1)
-            source_code = get_source_code(url_page)
-            soup = BeautifulSoup(source_code, 'lxml', from_encoding='gb18030')
 
-        nameList = soup.findAll("div", {"class": "fangList"})
-        i = 0
-        tracking.log_progress("GetHouseByCommunitylist", community.title, page + 1, total_pages)
-        data_source = []
-        hisprice_data_source = []
-        for name in nameList:  # per house loop
-            i = i + 1
-            info_dict = {}
-            try:
-                housetitle = name.find("p", {"class": "fangTitle"})
-                title = housetitle.a.get_text().strip()
-                info_dict.update({u'title':title})
-                link =  housetitle.a.get('href')
-                info_dict.update({u'link': link})
+        try:
 
-                metadata = {}
+            if page > 0:
+                url_page = (baseUrl + 'list/-h330-i3%d/') % (page + 1)
+                source_code = get_source_code(url_page)
+                soup = BeautifulSoup(source_code, 'lxml', from_encoding='gb18030')
 
-                linkParts = link.split('_')
-                if len(linkParts) < 1:
-                    logging.info("HouseId miss, pass: %s" % title)
-                    continue
+            nameList = soup.findAll("div", {"class": "fangList"})
+            i = 0
+            tracking.log_progress("GetHouseByCommunitylist", community.title, page + 1, total_pages)
+            data_source = []
+            hisprice_data_source = []
+            for name in nameList:  # per house loop
+                i = i + 1
+                info_dict = {}
+                try:
+                    housetitle = name.find("p", {"class": "fangTitle"})
+                    title = housetitle.a.get_text().strip()
+                    info_dict.update({u'title':title})
+                    link =  housetitle.a.get('href')
+                    info_dict.update({u'link': link})
 
-                info_dict.update({u'houseID':linkParts[1]})
-    
-                houseinfo = name.find("p", {"class": "mt5"})
+                    metadata = {}
 
-                info = houseinfo.get_text().split('|')
+                    linkParts = link.split('_')
+                    if len(linkParts) < 1:
+                        logging.info("HouseId miss, pass: %s" % title)
+                        continue
 
-                areaDom = name.find('ul', {"class": 'area'}).find('li')
+                    info_dict.update({u'houseID':linkParts[1]})
+        
+                    houseinfo = name.find("p", {"class": "mt5"})
 
-                info_dict.update({u'housetype': info[0]})
-                info_dict.update({u'square': areaDom.get_text()})
-                info_dict.update({u'direction': info[2]})
-                info_dict.update({u'floor': info[1]})
-                info_dict.update({u'years': info[3]})
-                
-                image = name.find("img")
-                info_dict.update({u'image': image.get('src')})
+                    info = houseinfo.get_text().split('|')
 
-                info_dict.update({u'community': community.title})
-                info_dict.update({u'communityId': community.id})
+                    areaDom = name.find('ul', {"class": 'area'}).find('li')
 
-                fangPositionicon = name.find('span', {"class": "fangPositionicon"})
-                metadata.update(
-                    {u'address': fangPositionicon.get_text().strip()})        
-
-                taxfree = name.find("span", {"class": "colorGreen"})
-                if taxfree == None:
-                    info_dict.update({u"taxtype": ""})
-                else:
-                    info_dict.update(
-                        {u"taxtype": taxfree.get_text().strip()})
-                
-                address_dt = name.find("span", {"class": "train"})
-                if address_dt != None:
-                    metadata.update(
-                        {u'address_dt': address_dt.get_text().strip()})                
-
-                totalPrice = name.find("span", {"class": "num"})
-
-                info_dict.update(
-                    {u'totalPrice': totalPrice.get_text()})
-
-                unitPrice = name.find("li",{"class": "update"})
-                if unitPrice != None:
-                    unitPriceRe = re.findall('\d+', unitPrice.get_text())
-                    if len(unitPriceRe) > 0:
-                        info_dict.update({u'unitPrice': str(unitPriceRe[0])})
-                
-                info_dict.update({u'channel': channel})
-                info_dict.update({u'metadata': json.dumps(metadata)})
-                
-            except:
-                continue
-            # houseinfo insert into mysql
+                    info_dict.update({u'housetype': info[0]})
+                    info_dict.update({u'square': areaDom.get_text()})
+                    info_dict.update({u'direction': info[2]})
+                    info_dict.update({u'floor': info[1]})
+                    info_dict.update({u'years': info[3]})
                     
-            data_source.append(info_dict)
-            hisprice_data_source.append(
-                {"houseID": info_dict["houseID"], "totalPrice": info_dict["totalPrice"], "channel": channel})
-            # model.Houseinfo.insert(**info_dict).upsert().execute()
-            #model.Hisprice.insert(houseID=info_dict['houseID'], totalPrice=info_dict['totalPrice']).upsert().execute()
+                    image = name.find("img")
+                    info_dict.update({u'image': image.get('src')})
 
-        with model.database.atomic():
-            if data_source:
-                model.Houseinfo.insert_many(data_source).upsert().execute()
-            if hisprice_data_source:
-                model.Hisprice.insert_many(
-                    hisprice_data_source).upsert().execute()
-        time.sleep(1)
+                    info_dict.update({u'community': community.title})
+                    info_dict.update({u'communityId': community.id})
+
+                    fangPositionicon = name.find('span', {"class": "fangPositionicon"})
+                    metadata.update(
+                        {u'address': fangPositionicon.get_text().strip()})        
+
+                    taxfree = name.find("span", {"class": "colorGreen"})
+                    if taxfree == None:
+                        info_dict.update({u"taxtype": ""})
+                    else:
+                        info_dict.update(
+                            {u"taxtype": taxfree.get_text().strip()})
+                    
+                    address_dt = name.find("span", {"class": "train"})
+                    if address_dt != None:
+                        metadata.update(
+                            {u'address_dt': address_dt.get_text().strip()})                
+
+                    totalPrice = name.find("span", {"class": "num"})
+
+                    info_dict.update(
+                        {u'totalPrice': totalPrice.get_text()})
+
+                    unitPrice = name.find("li",{"class": "update"})
+                    if unitPrice != None:
+                        unitPriceRe = re.findall('\d+', unitPrice.get_text())
+                        if len(unitPriceRe) > 0:
+                            info_dict.update({u'unitPrice': str(unitPriceRe[0])})
+                    
+                    info_dict.update({u'channel': channel})
+                    info_dict.update({u'metadata': json.dumps(metadata)})
+                    
+                except:
+                    continue
+                # houseinfo insert into mysql
+                        
+                data_source.append(info_dict)
+                hisprice_data_source.append(
+                    {"houseID": info_dict["houseID"], "totalPrice": info_dict["totalPrice"], "channel": channel})
+                # model.Houseinfo.insert(**info_dict).upsert().execute()
+                #model.Hisprice.insert(houseID=info_dict['houseID'], totalPrice=info_dict['totalPrice']).upsert().execute()
+
+            with model.database.atomic():
+                if data_source:
+                    model.Houseinfo.insert_many(data_source).upsert().execute()
+                if hisprice_data_source:
+                    model.Hisprice.insert_many(
+                        hisprice_data_source).upsert().execute()
+            time.sleep(1)
+        except:
+            pass
 
 
 def get_sell_percommunity(city, community):
@@ -232,80 +238,83 @@ def get_sell_percommunity(city, community):
         raise RuntimeError("Finish at %s because total_pages is None" % row)
 
     for page in range(total_pages):
-        if page > 0:
-            url_page = baseUrl + u"chengjiao/-p1%d-t11/" % page
-            source_code = get_source_code(url_page)
-            soup = BeautifulSoup(source_code, 'lxml', from_encoding='gb18030')
 
-        tracking.log_progress("GetSellByCommunitylist", community.title, page + 1, total_pages)
-        
-        data_source = []
-        for ultag in soup.findAll("ul", {"class": "listContent"}):
-            for name in ultag.find_all('li'):
-                info_dict = {}
-                try:
-                    housetitle = name.find("div", {"class": "title"})
-                    info_dict.update({u'title': housetitle.get_text().strip()})
-                    info_dict.update({u'link': housetitle.a.get('href')})
-                    houseID = housetitle.a.get(
-                        'href').split("/")[-1].split(".")[0]
-                    info_dict.update({u'houseID': houseID.strip()})
+        try:
+            if page > 0:
+                url_page = baseUrl + u"chengjiao/-p1%d-t11/" % page
+                source_code = get_source_code(url_page)
+                soup = BeautifulSoup(source_code, 'lxml', from_encoding='gb18030')
 
-                    house = housetitle.get_text().strip().split(' ')
-                    info_dict.update({u'community': community.title})
-                    info_dict.update({u'communityId': community.id})
-                    info_dict.update(
-                        {u'housetype': house[1].strip() if 1 < len(house) else ''})
-                    info_dict.update(
-                        {u'square': house[2].strip() if 2 < len(house) else ''})
+            tracking.log_progress("GetSellByCommunitylist", community.title, page + 1, total_pages)
+            
+            data_source = []
+            for ultag in soup.findAll("ul", {"class": "listContent"}):
+                for name in ultag.find_all('li'):
+                    info_dict = {}
+                    try:
+                        housetitle = name.find("div", {"class": "title"})
+                        info_dict.update({u'title': housetitle.get_text().strip()})
+                        info_dict.update({u'link': housetitle.a.get('href')})
+                        houseID = housetitle.a.get(
+                            'href').split("/")[-1].split(".")[0]
+                        info_dict.update({u'houseID': houseID.strip()})
 
-                    houseinfo = name.find("div", {"class": "houseInfo"})
-                    info = houseinfo.get_text().split('|')
-                    info_dict.update({u'direction': info[0].strip()})
-                    info_dict.update(
-                        {u'status': info[1].strip() if 1 < len(info) else ''})
-
-                    housefloor = name.find("div", {"class": "positionInfo"})
-                    floor_all = housefloor.get_text().strip().split(' ')
-                    info_dict.update({u'floor': floor_all[0].strip()})
-                    info_dict.update({u'years': floor_all[-1].strip()})
-
-                    followInfo = name.find("div", {"class": "source"})
-                    info_dict.update(
-                        {u'source': followInfo.get_text().strip()})
-
-                    totalPrice = name.find("div", {"class": "totalPrice"})
-                    if totalPrice.span is None:
+                        house = housetitle.get_text().strip().split(' ')
+                        info_dict.update({u'community': community.title})
+                        info_dict.update({u'communityId': community.id})
                         info_dict.update(
-                            {u'totalPrice': totalPrice.get_text().strip()})
-                    else:
+                            {u'housetype': house[1].strip() if 1 < len(house) else ''})
                         info_dict.update(
-                            {u'totalPrice': totalPrice.span.get_text().strip()})
+                            {u'square': house[2].strip() if 2 < len(house) else ''})
 
-                    unitPrice = name.find("div", {"class": "unitPrice"})
-                    if unitPrice.span is None:
+                        houseinfo = name.find("div", {"class": "houseInfo"})
+                        info = houseinfo.get_text().split('|')
+                        info_dict.update({u'direction': info[0].strip()})
                         info_dict.update(
-                            {u'unitPrice': unitPrice.get_text().strip()})
-                    else:
+                            {u'status': info[1].strip() if 1 < len(info) else ''})
+
+                        housefloor = name.find("div", {"class": "positionInfo"})
+                        floor_all = housefloor.get_text().strip().split(' ')
+                        info_dict.update({u'floor': floor_all[0].strip()})
+                        info_dict.update({u'years': floor_all[-1].strip()})
+
+                        followInfo = name.find("div", {"class": "source"})
                         info_dict.update(
-                            {u'unitPrice': unitPrice.span.get_text().strip()})
+                            {u'source': followInfo.get_text().strip()})
 
-                    dealDate = name.find("div", {"class": "dealDate"})
-                    info_dict.update(
-                        {u'dealdate': dealDate.get_text().strip().replace('.', '-')})
-                    
-                    info_dict.update({u'channel': channel})
-                except:
-                    continue
-                # Sellinfo insert into mysql
-                data_source.append(info_dict)
-                # model.Sellinfo.insert(**info_dict).upsert().execute()
+                        totalPrice = name.find("div", {"class": "totalPrice"})
+                        if totalPrice.span is None:
+                            info_dict.update(
+                                {u'totalPrice': totalPrice.get_text().strip()})
+                        else:
+                            info_dict.update(
+                                {u'totalPrice': totalPrice.span.get_text().strip()})
 
-        with model.database.atomic():
-            if data_source:
-                model.Sellinfo.insert_many(data_source).upsert().execute()
-        time.sleep(1)
+                        unitPrice = name.find("div", {"class": "unitPrice"})
+                        if unitPrice.span is None:
+                            info_dict.update(
+                                {u'unitPrice': unitPrice.get_text().strip()})
+                        else:
+                            info_dict.update(
+                                {u'unitPrice': unitPrice.span.get_text().strip()})
 
+                        dealDate = name.find("div", {"class": "dealDate"})
+                        info_dict.update(
+                            {u'dealdate': dealDate.get_text().strip().replace('.', '-')})
+                        
+                        info_dict.update({u'channel': channel})
+                    except:
+                        continue
+                    # Sellinfo insert into mysql
+                    data_source.append(info_dict)
+                    # model.Sellinfo.insert(**info_dict).upsert().execute()
+
+            with model.database.atomic():
+                if data_source:
+                    model.Sellinfo.insert_many(data_source).upsert().execute()
+            time.sleep(1)
+        except:
+            pass
 
 def get_community_perregion(city, regionname=u'xicheng'):
     baseUrl = u"http://%s.esf.fang.com/housing/" % (city)
@@ -325,88 +334,90 @@ def get_community_perregion(city, regionname=u'xicheng'):
 
     prevUrl = url
     for page in range(total_pages):
-        if page > 2:
-            continue
-        if page > 0:
-            params = regionname.split('_')
-            if len(params) > 4:
-                params[len(params)-4] = str(page + 1)
 
-            url_page = baseUrl +  '_'.join(params) + '/'
-            source_code = get_source_code(url_page, {
-                # 'headers' : {
-                #     'referer': prevUrl
-                # }
-            })
-            prevUrl = url_page
-           
-            soup = BeautifulSoup(source_code, 'lxml', from_encoding='gb18030')
+        try:
+            if page > 0:
+                params = regionname.split('_')
+                if len(params) > 4:
+                    params[len(params)-4] = str(page + 1)
 
-        nameList = soup.findAll("div", {"class": "list"})
-        i = 0
-        tracking.log_progress("GetCommunityByRegionlist",
-                     regionname, page + 1, total_pages)
-        data_source = []
-        for name in nameList:  # Per house loop
-            i = i + 1
-            info_dict = {}
-            try:
-                communitytitle = name.find("a", {"class": "plotTit"})
-                title = communitytitle.get_text().strip('\n')
-                link = communitytitle.get('href')
-                info_dict.update({u'title': title})
+                url_page = baseUrl +  '_'.join(params) + '/'
+                source_code = get_source_code(url_page, {
+                    # 'headers' : {
+                    #     'referer': prevUrl
+                    # }
+                })
+                prevUrl = url_page
+            
+                soup = BeautifulSoup(source_code, 'lxml', from_encoding='gb18030')
 
-                if link.startswith('http') or link.startswith('https') or link.startswith('//'):
-                    info_dict.update({u'link': link})
-                else:
-                    logging.info('Get Community pass, link:' + link)
+            nameList = soup.findAll("div", {"class": "list"})
+            i = 0
+            tracking.log_progress("GetCommunityByRegionlist",
+                        regionname, page + 1, total_pages)
+            data_source = []
+            for name in nameList:  # Per house loop
+                i = i + 1
+                info_dict = {}
+                try:
+                    communitytitle = name.find("a", {"class": "plotTit"})
+                    title = communitytitle.get_text().strip('\n')
+                    link = communitytitle.get('href')
+                    info_dict.update({u'title': title})
+
+                    if link.startswith('http') or link.startswith('https') or link.startswith('//'):
+                        info_dict.update({u'link': link})
+                    else:
+                        logging.info('Get Community pass, link:' + link)
+                        continue
+
+                    districtInfo = communitytitle.find_parent().find_next_sibling('p')
+                    district = districtInfo.findAll("a")
+
+                    info_dict.update({u'district': district[0].get_text()})
+                    info_dict.update({u'bizcircle': district[1].get_text()})
+
+                    tagList = districtInfo.get_text()
+                    info_dict.update({u'tagList': tagList.strip('\n')})
+
+                    onsale = name.find("ul", {"class": "sellOrRenthy"})
+                    info_dict.update(
+                        {u'onsale': onsale.find('li').find('a').get_text().strip('\n').strip()})
+
+                    onrent = onsale.find('li').find_next_sibling('li').find("a")
+                    info_dict.update(
+                        {u'onrent': onrent.get_text().strip('\n').strip()})
+
+                    year = onsale.find('li').find_next_sibling('li').find_next_sibling('li')
+                    info_dict.update({u'year': year.get_text()})
+
+                    # matchResult = re.match('http:|https:|\/\/(.*)\.fang.com.*', link, re.M |re.I)
+
+                    price = name.find("p", {"class": "priceAverage"})
+                    info_dict.update({u'price': price.span.get_text().strip('\n')})
+
+                    image = name.find("dl", {"class": "plotListwrap"}).find('dt').find('img')
+                    info_dict.update({u'image': image.get('src')})
+
+                    info_dict.update({u'channel': channel})
+
+                    communityinfo = get_communityinfo_by_url(link)
+                    for key, value in communityinfo.iteritems():
+                        info_dict.update({key: value})
+
+                    info_dict.update({u'city': city})
+
+                    # communityinfo insert into mysql
+                    model.Community.insert(**info_dict).upsert().execute()
+
+                except:
+                    logging.error('Get Community error: ' + title)
+                    logging.error(info_dict)
                     continue
-
-                districtInfo = communitytitle.find_parent().find_next_sibling('p')
-                district = districtInfo.findAll("a")
-
-                info_dict.update({u'district': district[0].get_text()})
-                info_dict.update({u'bizcircle': district[1].get_text()})
-
-                tagList = districtInfo.get_text()
-                info_dict.update({u'tagList': tagList.strip('\n')})
-
-                onsale = name.find("ul", {"class": "sellOrRenthy"})
-                info_dict.update(
-                    {u'onsale': onsale.find('li').find('a').get_text().strip('\n').strip()})
-
-                onrent = onsale.find('li').find_next_sibling('li').find("a")
-                info_dict.update(
-                    {u'onrent': onrent.get_text().strip('\n').strip()})
-
-                year = onsale.find('li').find_next_sibling('li').find_next_sibling('li')
-                info_dict.update({u'year': year.get_text()})
-
-                # matchResult = re.match('http:|https:|\/\/(.*)\.fang.com.*', link, re.M |re.I)
-
-                price = name.find("p", {"class": "priceAverage"})
-                info_dict.update({u'price': price.span.get_text().strip('\n')})
-
-                image = name.find("dl", {"class": "plotListwrap"}).find('dt').find('img')
-                info_dict.update({u'image': image.get('src')})
-
-                info_dict.update({u'channel': channel})
-
-                communityinfo = get_communityinfo_by_url(link)
-                for key, value in communityinfo.iteritems():
-                    info_dict.update({key: value})
-
-                info_dict.update({u'city': city})
-
-                # communityinfo insert into mysql
-                model.Community.insert(**info_dict).upsert().execute()
-
-            except:
-                logging.error('Get Community error: ' + title)
-                logging.error(info_dict)
-                continue
-        
-        time.sleep(1)
+            
+            time.sleep(1)
+        except:
+            pass
 
 
 def get_rent_percommunity(city, communityname):
@@ -425,77 +436,81 @@ def get_rent_percommunity(city, communityname):
         raise RuntimeError("Finish at %s because total_pages is None" % row)
 
     for page in range(total_pages):
-        if page > 0:
-            url_page = baseUrl + \
-                u"rent/pg%drs%s/" % (page,
-                                     urllib2.quote(communityname.encode('utf8')))
-            source_code = misc.get_source_code(url_page)
-            soup = BeautifulSoup(source_code, 'lxml')
-        i = 0
-        tracking.log_progress("GetRentByCommunitylist",
-                     communityname, page + 1, total_pages)
-        data_source = []
-        for ultag in soup.findAll("ul", {"class": "house-lst"}):
-            for name in ultag.find_all('li'):
-                i = i + 1
-                info_dict = {}
-                try:
-                    housetitle = name.find("div", {"class": "info-panel"})
-                    info_dict.update({u'title': housetitle.get_text().strip()})
-                    info_dict.update({u'link': housetitle.a.get('href')})
-                    houseID = housetitle.a.get(
-                        'href').split("/")[-1].split(".")[0]
-                    info_dict.update({u'houseID': houseID})
 
-                    region = name.find("span", {"class": "region"})
-                    info_dict.update({u'region': region.get_text().strip()})
+        try:
+            if page > 0:
+                url_page = baseUrl + \
+                    u"rent/pg%drs%s/" % (page,
+                                        urllib2.quote(communityname.encode('utf8')))
+                source_code = misc.get_source_code(url_page)
+                soup = BeautifulSoup(source_code, 'lxml')
+            i = 0
+            tracking.log_progress("GetRentByCommunitylist",
+                        communityname, page + 1, total_pages)
+            data_source = []
+            for ultag in soup.findAll("ul", {"class": "house-lst"}):
+                for name in ultag.find_all('li'):
+                    i = i + 1
+                    info_dict = {}
+                    try:
+                        housetitle = name.find("div", {"class": "info-panel"})
+                        info_dict.update({u'title': housetitle.get_text().strip()})
+                        info_dict.update({u'link': housetitle.a.get('href')})
+                        houseID = housetitle.a.get(
+                            'href').split("/")[-1].split(".")[0]
+                        info_dict.update({u'houseID': houseID})
 
-                    zone = name.find("span", {"class": "zone"})
-                    info_dict.update({u'zone': zone.get_text().strip()})
+                        region = name.find("span", {"class": "region"})
+                        info_dict.update({u'region': region.get_text().strip()})
 
-                    meters = name.find("span", {"class": "meters"})
-                    info_dict.update({u'meters': meters.get_text().strip()})
+                        zone = name.find("span", {"class": "zone"})
+                        info_dict.update({u'zone': zone.get_text().strip()})
 
-                    other = name.find("div", {"class": "con"})
-                    info_dict.update({u'other': other.get_text().strip()})
+                        meters = name.find("span", {"class": "meters"})
+                        info_dict.update({u'meters': meters.get_text().strip()})
 
-                    subway = name.find("span", {"class": "fang-subway-ex"})
-                    if subway is None:
-                        info_dict.update({u'subway': ""})
-                    else:
+                        other = name.find("div", {"class": "con"})
+                        info_dict.update({u'other': other.get_text().strip()})
+
+                        subway = name.find("span", {"class": "fang-subway-ex"})
+                        if subway is None:
+                            info_dict.update({u'subway': ""})
+                        else:
+                            info_dict.update(
+                                {u'subway': subway.span.get_text().strip()})
+
+                        decoration = name.find("span", {"class": "decoration-ex"})
+                        if decoration is None:
+                            info_dict.update({u'decoration': ""})
+                        else:
+                            info_dict.update(
+                                {u'decoration': decoration.span.get_text().strip()})
+
+                        heating = name.find("span", {"class": "heating-ex"})
                         info_dict.update(
-                            {u'subway': subway.span.get_text().strip()})
+                            {u'heating': heating.span.get_text().strip()})
 
-                    decoration = name.find("span", {"class": "decoration-ex"})
-                    if decoration is None:
-                        info_dict.update({u'decoration': ""})
-                    else:
+                        price = name.find("div", {"class": "price"})
                         info_dict.update(
-                            {u'decoration': decoration.span.get_text().strip()})
+                            {u'price': int(price.span.get_text().strip())})
 
-                    heating = name.find("span", {"class": "heating-ex"})
-                    info_dict.update(
-                        {u'heating': heating.span.get_text().strip()})
+                        pricepre = name.find("div", {"class": "price-pre"})
+                        info_dict.update(
+                            {u'pricepre': pricepre.get_text().strip()})
 
-                    price = name.find("div", {"class": "price"})
-                    info_dict.update(
-                        {u'price': int(price.span.get_text().strip())})
+                        info_dict.update({u'channel': channel})
+                    except:
+                        continue
+                    # Rentinfo insert into mysql
+                    data_source.append(info_dict)
+                    # model.Rentinfo.insert(**info_dict).upsert().execute()
 
-                    pricepre = name.find("div", {"class": "price-pre"})
-                    info_dict.update(
-                        {u'pricepre': pricepre.get_text().strip()})
-
-                    info_dict.update({u'channel': channel})
-                except:
-                    continue
-                # Rentinfo insert into mysql
-                data_source.append(info_dict)
-                # model.Rentinfo.insert(**info_dict).upsert().execute()
-
-        with model.database.atomic():
-            if data_source:
-                model.Rentinfo.insert_many(data_source).upsert().execute()
-        time.sleep(1)
+            with model.database.atomic():
+                if data_source:
+                    model.Rentinfo.insert_many(data_source).upsert().execute()
+            time.sleep(1)
+        except:
+            pass
 
 
 def get_house_perregion(city, district):
@@ -505,7 +520,6 @@ def get_house_perregion(city, district):
 
     url = baseUrl + u"/%s/" % district
     source_code = get_source_code(url)
-
     soup = BeautifulSoup(source_code, 'lxml', from_encoding='gb18030')
     if check_block(soup):
         return
@@ -516,100 +530,107 @@ def get_house_perregion(city, district):
         raise RuntimeError("Finish at %s because total_pages is None" % row)
 
     for page in range(total_pages):
-        if page > 0:
-            url_page = baseUrl + u"/%s/i3%d/" % (district, page + 1)
-            logging.info(url_page)
-            source_code = get_source_code(url_page)
-            soup = BeautifulSoup(source_code, 'lxml',  from_encoding='gb18030')
-        i = 0
 
-        tracking.log_progress("GetHouseByRegionlist", district, page + 1, total_pages)
-        data_source = []
-        hisprice_data_source = []
-        for ultag in soup.findAll("div", {"class": "shop_list"}):
-            for name in ultag.select('dl[data-bg]'):
-                i = i + 1
-                info_dict = {}
-                metadata = {}
-                try:
-                    housetitle = name.find("span", {"class": "tit_shop"}).find_parent()
+        try:
+            if page > 0:
+                url_page = baseUrl + u"/%s/i3%d/" % (district, page + 1)
+                logging.info(url_page)
+                source_code = get_source_code(url_page)
+                soup = BeautifulSoup(source_code, 'lxml',  from_encoding='gb18030')
 
-                    info_dict.update(
-                        {u'title': housetitle.get('title')})
-                    info_dict.update({u'link': baseUrl + housetitle.get('href')})
+            i = 0
 
-                    houseJson = json.loads(name.get('data-bg'))
+            tracking.log_progress("GetHouseByRegionlist", district, page + 1, total_pages)
+            data_source = []
+            hisprice_data_source = []
+            for ultag in soup.findAll("div", {"class": "shop_list"}):
+                for name in ultag.select('dl[data-bg]'):
+                    i = i + 1
+                    info_dict = {}
+                    metadata = {}
+                    try:
+                        housetitle = name.find("span", {"class": "tit_shop"}).find_parent()
 
-                    info_dict.update({u'houseID': houseJson['houseid']})
-     
-                    houseinfo = name.find("p", {"class": "tel_shop"})
-
-                    info = houseinfo.get_text().split('|')
-
-                    info_dict.update({u'housetype': info[0]})
-                    info_dict.update({u'square': info[1]})
-                    info_dict.update({u'direction': info[3]})
-                    info_dict.update({u'floor': info[2]})
-                    info_dict.update({u'years': info[4]})
-                   
-                    image = name.find("img")
-                    info_dict.update({u'image': image.get('src')})
-
-                    positionInfo = name.find("p", {"class": "add_shop"})
-                    info_dict.update({u'community': positionInfo.a.get('title')})
-                    communityInfo = positionInfo.a
-                    if communityInfo != None:
-                        communityHref = communityInfo.get('href');
-                        communityId = communityHref.strip('/')
-                        if len(communityId) > 0:
-                            info_dict.update({u'communityId': communityId})
-
-                    metadata.update(
-                        {u'address': positionInfo.find('span').get_text().strip()})        
-
-                    taxfree = name.find("span", {"class": "colorPink"})
-                    if taxfree == None:
-                        info_dict.update({u"taxtype": ""})
-                    else:
                         info_dict.update(
-                            {u"taxtype": taxfree.get_text().strip()})
+                            {u'title': housetitle.get('title')})
+                        info_dict.update({u'link': baseUrl + housetitle.get('href')})
+
+                        houseJson = json.loads(name.get('data-bg'))
+
+                        info_dict.update({u'houseID': houseJson['houseid']})
+        
+                        houseinfo = name.find("p", {"class": "tel_shop"})
+
+                        info = houseinfo.get_text().split('|')
+
+                        info_dict.update({u'housetype': info[0]})
+                        info_dict.update({u'square': info[1]})
+                        info_dict.update({u'direction': info[3]})
+                        info_dict.update({u'floor': info[2]})
+                        info_dict.update({u'years': info[4]})
                     
-                    address_dt = name.find("span", {"class": "icon_dt"})
-                    if address_dt != None:
+                        image = name.find("img")
+                        info_dict.update({u'image': image.get('src')})
+
+                        positionInfo = name.find("p", {"class": "add_shop"})
+                        info_dict.update({u'community': positionInfo.a.get('title')})
+                        communityInfo = positionInfo.a
+                        if communityInfo != None:
+                            communityHref = communityInfo.get('href');
+                            communityId = communityHref.strip('/')
+                            if len(communityId) > 0:
+                                info_dict.update({u'communityId': communityId})
+
                         metadata.update(
-                            {u'address_dt': address_dt.get_text().strip()})                
+                            {u'address': positionInfo.find('span').get_text().strip()})        
 
-                    totalPrice = name.find("dd", {"class": "price_right"})
+                        taxfree = name.find("span", {"class": "colorPink"})
+                        if taxfree == None:
+                            info_dict.update({u"taxtype": ""})
+                        else:
+                            info_dict.update(
+                                {u"taxtype": taxfree.get_text().strip()})
+                        
+                        address_dt = name.find("span", {"class": "icon_dt"})
+                        if address_dt != None:
+                            metadata.update(
+                                {u'address_dt': address_dt.get_text().strip()})                
 
-                    info_dict.update(
-                        {u'totalPrice': totalPrice.find('b').get_text()})
+                        totalPrice = name.find("dd", {"class": "price_right"})
 
-                    unitPrice = totalPrice.findAll("span")
-                    if unitPrice != None and len(unitPrice) > 0:
-                        unitPriceText = unitPrice[len(unitPrice) - 1].get_text()
-                        unitPriceRe = re.findall('\d+', unitPriceText)
-                        if len(unitPriceRe) > 0:
-                            info_dict.update({u'unitPrice': str(unitPriceRe[0])})
-                  
-                    info_dict.update({u'channel': channel})
-                    info_dict.update({u'metadata': json.dumps(metadata)})
-                except:
-                    continue
+                        info_dict.update(
+                            {u'totalPrice': totalPrice.find('b').get_text()})
 
-                # Houseinfo insert into mysql
-                data_source.append(info_dict)
-                hisprice_data_source.append(
-                    {"houseID": info_dict["houseID"], "totalPrice": info_dict["totalPrice"], 'channel': channel})
-                # model.Houseinfo.insert(**info_dict).upsert().execute()
-                #model.Hisprice.insert(houseID=info_dict['houseID'], totalPrice=info_dict['totalPrice']).upsert().execute()
+                        unitPrice = totalPrice.findAll("span")
+                        if unitPrice != None and len(unitPrice) > 0:
+                            unitPriceText = unitPrice[len(unitPrice) - 1].get_text()
+                            unitPriceRe = re.findall('\d+', unitPriceText)
+                            if len(unitPriceRe) > 0:
+                                info_dict.update({u'unitPrice': str(unitPriceRe[0])})
+                    
+                        info_dict.update({u'channel': channel})
+                        info_dict.update({u'metadata': json.dumps(metadata)})
+                    except:
+                        continue
 
-        with model.database.atomic():
-            if data_source:
-                model.Houseinfo.insert_many(data_source).upsert().execute()
-            if hisprice_data_source:
-                model.Hisprice.insert_many(hisprice_data_source).upsert().execute()
+                    # Houseinfo insert into mysql
+                    data_source.append(info_dict)
+                    hisprice_data_source.append(
+                        {"houseID": info_dict["houseID"], "totalPrice": info_dict["totalPrice"], 'channel': channel})
+                    # model.Houseinfo.insert(**info_dict).upsert().execute()
+                    #model.Hisprice.insert(houseID=info_dict['houseID'], totalPrice=info_dict['totalPrice']).upsert().execute()
 
-        time.sleep(1)
+            with model.database.atomic():
+                if data_source:
+                    model.Houseinfo.insert_many(data_source).upsert().execute()
+                if hisprice_data_source:
+                    model.Hisprice.insert_many(hisprice_data_source).upsert().execute()
+
+            time.sleep(1)
+
+        except:
+            pass
+      
 
 
 def get_rent_perregion(city, district):

@@ -9,8 +9,7 @@ DBPORT = 3306
 LOG_PATH = '/data/logs/scrawl/'
 
 PROXY_ON = False
-
-PROXY_API= 'http://192.168.1.3:33006/get/'
+PROXY_API= 'http://192.168.1.3:33006/get/?speed=1000'
 
 CITY = 'wh'  # only one, shanghai=sh shenzhen=sh......
 REGIONLIST = [u'dongxihu', 'jiangan']  # only pinyin support
