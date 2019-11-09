@@ -64,7 +64,7 @@ def get_source_code(url, options = {}):
                 proxies = options['proxy']
 
         result = requests.get(
-            url, headers=headers, proxies=proxies)
+            url, headers=headers, proxies=proxies, timeout=5)
         #result = requests.get(url)
         source_code = result.content
     except ProxyError as e:
