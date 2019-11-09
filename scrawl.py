@@ -4,12 +4,13 @@ import settings
 import sys
 from util.log import Log
 import getopt
+import misc
 
 logging = Log()
 
 def get_communitylist(channel, city):
     res = []
-    for community in model.Community.select().where(model.Community.city == city , model.Community.channel == channel):
+    for community in model.Community.select().where(model.Community.city == city , model.Community.channel == channel, model.Community.id == '2610153020'):
         res.append(community)
     return res
 
@@ -21,7 +22,7 @@ if __name__ == "__main__":
     
     moduleList = []
 
-    options, args = getopt.getopt(sys.argv[1:], 'c:m:')
+    options, args = getopt.getopt(sys.argv[1:], 'c:m:z:')
     logging.info(options)
 
     for opt, value in options:
@@ -29,6 +30,9 @@ if __name__ == "__main__":
             chstr = value
         if opt in ("-m"):  
             moduleList.append(value)
+        if opt in ('-z'):
+            lowerval = value.lower()
+            settings.PROXY_ON = lowerval == '1' or lowerval == 'on' or lowerval == 'true'
 
     if len(moduleList) == 0:
         moduleList = ['house', 'rent', 'community', 'sell', 'house_community']
@@ -42,7 +46,11 @@ if __name__ == "__main__":
     else:
         raise LookupError('Channel parameter is wrong!')
 
-    logging.info(settings.CHANNEL_PARAM[chstr]);
+    logging.info(settings.CHANNEL_PARAM[chstr])
+
+    # res = misc.get_source_code('http://106.14.179.179/httpbin/get')
+    # logging.info(res)
+    # sys.exit()
 
     regionlist = settings.CHANNEL_PARAM[chstr]['REGIONLIST']  # only pinyin support
     city = settings.CHANNEL_PARAM[chstr]['CITY']

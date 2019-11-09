@@ -1,3 +1,4 @@
+#coding:utf-8
 import requests
 import random
 from datetime import datetime
@@ -5,8 +6,12 @@ from bs4 import BeautifulSoup
 import threading
 from six.moves import urllib
 import socket
+import settings
+import traceback
 
 from util.log import Log
+import json
+from requests.exceptions import ProxyError
 logging = Log()
 
 hds = [{'User-Agent': 'Mozilla/5.0 (Windows; U; Windows NT 6.1; en-US; rv:1.9.1.6) Gecko/20091201 Firefox/3.5.6'},
@@ -40,20 +45,49 @@ hd = {
 def get_source_code(url, options = {}):
     try:
         headers = hds[random.randint(0, len(hds) - 1)]
-        if options and options['headers']:
+        if options and options.has_key('headers'):
             for attr, value in options['headers'].items():
                 headers[attr] = value
         
         #logging.info(headers)
 
+        proxies = None
+
+        if settings.PROXY_ON:
+            proxies = get_proxy()
+     
+        if options and options.has_key('proxy'):
+            logging.info(options['proxy'])
+            if options['proxy'] == None:
+                proxies = None
+            else:
+                proxies = options['proxy']
+
         result = requests.get(
-            url, headers=headers)
+            url, headers=headers, proxies=proxies)
         #result = requests.get(url)
         source_code = result.content
-    except Exception as e:
-        print(e)
-        return
+    except ProxyError as e:
 
+        if options and options.has_key('proxy_retry'):
+            if options['proxy_retry']< 5:
+                options['proxy_retry'] = options['proxy_retry']+1
+                logging.error("Request proxy error retry %d times: %s" % (options['proxy_retry'], url))
+                return get_source_code(url, options)
+            else:
+                logging.error("Request abandon after proxy error %d times: %s" % (options['proxy_retry'], url))
+                return
+        else:
+            if not options:
+                options = {}
+            options['proxy_retry'] = 1
+            logging.error("Request proxy error retry %d times: %s" % (options['proxy_retry'], url))
+            return get_source_code(url, options)
+
+    except Exception as e:
+        traceback.print_exc()
+        return
+   
     return source_code
 
 
@@ -153,6 +187,21 @@ def test_proxyip():
 def prepare_proxy():
     spider_proxyip()
     test_proxyip()
+
+def get_proxy():
+    proxyUrl = settings.PROXY_API
+
+    result = requests.get(proxyUrl)
+    res = result.content
+    if not res:
+        return None
+
+    #obj = {"http": "http://103.216.82.146:6666"}
+    obj = json.loads(res)
+    if not obj:
+        return None
+
+    return obj
 
 
 def readurl_by_proxy(url):
