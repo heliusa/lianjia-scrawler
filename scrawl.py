@@ -10,7 +10,7 @@ logging = Log()
 
 def get_communitylist(channel, city):
     res = []
-    for community in model.Community.select().where(model.Community.city == city , model.Community.channel == channel, model.Community.id == '2610153020'):
+    for community in model.Community.select().where(model.Community.city == city , model.Community.channel == channel):
         res.append(community)
     return res
 
