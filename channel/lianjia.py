@@ -6,54 +6,54 @@ import time
 import datetime
 import urllib2
 import re
-from util.log import Log
+from util.tracking import Tracking
 import traceback
+from util.logger import logging
 
-logging = Log()
+tracking = Tracking()
 
 channel = 'lianjia'
 
 def GetHouseByCommunitylist(city, communitylist):
-
-    logging.info("Get House Infomation").start()
+    tracking.start("Get House By Community")
 
     for community in communitylist:
         try:
             get_house_percommunity(city, community)
         except Exception as e:
             logging.error(e)
-            logging.error(community + "Fail")
+            logging.error(community.title + "Fail")
             pass
 
-    logging.end()
+    tracking.end()
 
 def GetSellByCommunitylist(city, communitylist):
-    logging.info("Get Sell Infomation").start()
+    tracking.start("Get Sell Infomation")
     for community in communitylist:
         try:
             get_sell_percommunity(city, community)
         except Exception as e:
             logging.error(e)
-            logging.error(community + "Fail")
+            logging.error(community.title + "Fail")
             pass
-    logging.end()
+    tracking.end()
 
 def GetRentByCommunitylist(city, communitylist):
 
-    logging.info("Get Rent Infomation").start()
+    tracking.start("Get Rent Infomation")
 
     for community in communitylist:
         try:
             get_rent_percommunity(city, community)
         except Exception as e:
             logging.error(e)
-            logging.error(community + "Fail")
+            logging.error(community.title + "Fail")
             pass
-    logging.end()
+    tracking.end()
 
 
 def GetCommunityByRegionlist(city, regionlist=[u'xicheng']):
-    logging.info("Get Community Infomation").start()
+    tracking.start("Get Community Infomation")
     for regionname in regionlist:
         try:
             get_community_perregion(city, regionname)
@@ -62,11 +62,11 @@ def GetCommunityByRegionlist(city, regionlist=[u'xicheng']):
             logging.error(e)
             logging.error(regionname + "Fail")
             pass
-    logging.end()
+    tracking.end()
 
 
 def GetHouseByRegionlist(city, regionlist=[u'xicheng']):
-    logging.start()
+    tracking.start()
     for regionname in regionlist:
         logging.info("Get Onsale House Infomation in %s" % regionname)
         try:
@@ -74,11 +74,11 @@ def GetHouseByRegionlist(city, regionlist=[u'xicheng']):
         except Exception as e:
             logging.error(e)
             pass
-    logging.end()
+    tracking.end()
 
 
 def GetRentByRegionlist(city, regionlist=[u'xicheng']):
-    logging.start()
+    tracking.start()
     for regionname in regionlist:
         logging.info("Get Rent House Infomation in %s" % regionname)
         try:
@@ -86,7 +86,7 @@ def GetRentByRegionlist(city, regionlist=[u'xicheng']):
         except Exception as e:
             logging.error(e)
             pass
-    logging.end()
+    tracking.end()
 
 
 def get_house_percommunity(city, community):
@@ -114,7 +114,7 @@ def get_house_percommunity(city, community):
 
         nameList = soup.findAll("li", {"class": "clear"})
         i = 0
-        logging.log_progress("GetHouseByCommunitylist",
+        tracking.log_progress("GetHouseByCommunitylist",
                      community.title, page + 1, total_pages)
         data_source = []
         hisprice_data_source = []
@@ -195,7 +195,7 @@ def get_sell_percommunity(city, community):
             source_code = misc.get_source_code(url_page)
             soup = BeautifulSoup(source_code, 'lxml')
 
-        logging.log_progress("GetSellByCommunitylist",
+        tracking.log_progress("GetSellByCommunitylist",
                      community.title, page + 1, total_pages)
         data_source = []
         for ultag in soup.findAll("ul", {"class": "listContent"}):
@@ -286,7 +286,7 @@ def get_community_perregion(city, regionname=u'xicheng'):
 
         nameList = soup.findAll("li", {"class": "clear"})
         i = 0
-        logging.log_progress("GetCommunityByRegionlist",
+        tracking.log_progress("GetCommunityByRegionlist",
                      regionname, page + 1, total_pages)
         data_source = []
         for name in nameList:  # Per house loop
@@ -371,7 +371,7 @@ def get_rent_percommunity(city, communityname):
             source_code = misc.get_source_code(url_page)
             soup = BeautifulSoup(source_code, 'lxml')
         i = 0
-        logging.log_progress("GetRentByCommunitylist",
+        tracking.log_progress("GetRentByCommunitylist",
                      communityname, page + 1, total_pages)
         data_source = []
         for ultag in soup.findAll("ul", {"class": "house-lst"}):
@@ -456,7 +456,7 @@ def get_house_perregion(city, district):
             source_code = misc.get_source_code(url_page)
             soup = BeautifulSoup(source_code, 'lxml')
         i = 0
-        logging.log_progress("GetHouseByRegionlist", district, page + 1, total_pages)
+        tracking.log_progress("GetHouseByRegionlist", district, page + 1, total_pages)
         data_source = []
         hisprice_data_source = []
         for ultag in soup.findAll("ul", {"class": "sellListContent"}):
@@ -555,7 +555,7 @@ def get_rent_perregion(city, district):
             source_code = misc.get_source_code(url_page)
             soup = BeautifulSoup(source_code, 'lxml')
         i = 0
-        logging.log_progress("GetRentByRegionlist", district, page + 1, total_pages)
+        tracking.log_progress("GetRentByRegionlist", district, page + 1, total_pages)
         data_source = []
         for ultag in soup.findAll("ul", {"class": "house-lst"}):
             for name in ultag.find_all('li'):

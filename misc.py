@@ -9,10 +9,9 @@ import socket
 import settings
 import traceback
 
-from util.log import Log
+from util.logger import logging
 import json
-from requests.exceptions import ProxyError
-logging = Log()
+from requests.exceptions import ProxyError, ConnectTimeout, ReadTimeout
 
 hds = [{'User-Agent': 'Mozilla/5.0 (Windows; U; Windows NT 6.1; en-US; rv:1.9.1.6) Gecko/20091201 Firefox/3.5.6'},
        {'User-Agent': 'Mozilla/5.0 (Windows NT 6.2) AppleWebKit/535.11 (KHTML, like Gecko) Chrome/17.0.963.12 Safari/535.11'},
@@ -43,6 +42,7 @@ hd = {
 
 
 def get_source_code(url, options = {}):
+
     try:
         headers = hds[random.randint(0, len(hds) - 1)]
         if options and options.has_key('headers'):
@@ -57,7 +57,6 @@ def get_source_code(url, options = {}):
             proxies = get_proxy()
      
         if options and options.has_key('proxy'):
-            logging.info(options['proxy'])
             if options['proxy'] == None:
                 proxies = None
             else:
@@ -65,9 +64,13 @@ def get_source_code(url, options = {}):
 
         result = requests.get(
             url, headers=headers, proxies=proxies, timeout=5)
-        #result = requests.get(url)
-        source_code = result.content
-    except ProxyError as e:
+
+        if result.status_code < 400:
+            source_code = result.content
+        else:
+            raise ProxyError()
+     
+    except (ProxyError, ConnectTimeout, ReadTimeout):
 
         if options and options.has_key('proxy_retry'):
             if options['proxy_retry']< 5:
@@ -87,7 +90,7 @@ def get_source_code(url, options = {}):
     except Exception as e:
         traceback.print_exc()
         return
-   
+
     return source_code
 
 

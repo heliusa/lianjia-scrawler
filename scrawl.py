@@ -2,11 +2,9 @@ from channel import lianjia,fang
 import model
 import settings
 import sys
-from util.log import Log
 import getopt
 import misc
-
-logging = Log()
+from util.logger import logging
 
 def get_communitylist(channel, city):
     res = []
