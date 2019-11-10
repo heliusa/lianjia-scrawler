@@ -64,7 +64,7 @@ def get_source_code(url, options = {}):
 
         source_code = None
         re_conn_times = 5
-        
+
         for cnt in range(re_conn_times):
             try:
                 result = requests.get(
@@ -194,6 +194,9 @@ def get_proxy():
     #obj = {"http": "http://103.216.82.146:6666"}
     obj = json.loads(res)
     if not obj:
+        return None
+
+    if obj.has_key('code') and obj['code'] != 0:
         return None
 
     return obj
